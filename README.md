@@ -1,69 +1,92 @@
-# Sarnas Security Gate — демо и пилот
+# Sarnas Security Gate — демо
 
-Демонстрационный репозиторий для пилота **Security Gate** (проект SGATE,
-заказчик — АльфаСтрахование). Здесь собраны работающие проверки из того, что
-уже есть у Sarnas:
+Самопроверяющееся демо сервиса **Security Gate** (проект SGATE, заказчик —
+АльфаСтрахование). Показывает два слоя, которые входят в сервис:
 
-| Слой | Продукт | Что проверяет | Блокирует |
-|---|---|---|---|
-| SCA | **Deps** (GitHub App) | уязвимые версии пакетов, OSV, достижимость, план обновления | CRITICAL/HIGH |
-| Секреты и ПДн | **Guardrail** (GitHub Action) | ключи, токены, пароли, персональные данные РФ в диффе | секреты |
-| SAST | **Semgrep** | небезопасные конструкции в коде | ERROR |
-| Контейнеры/IaC | **Trivy** | Dockerfile, конфигурация инфраструктуры | CRITICAL/HIGH |
+| Слой | Продукт | Что проверяет | Блокирует | Сеть |
+|---|---|---|---|---|
+| SCA | **Deps** | уязвимые версии пакетов по офлайн-базе OSV | CRITICAL/HIGH | не нужна |
+| Секреты и ПДн | **Guardrail** | ключи, токены, пароли, телефоны, email, ИНН, СНИЛС, паспорт в диффе | любая находка | не нужна |
 
-Политика пилота: **CRITICAL/HIGH — блокировка, MODERATE — предупреждение,
-исключение — только с владельцем и сроком.**
+**Контракт:** нашли блокирующую находку — пайп остановлен. Не нашли — пайп
+идёт дальше. Оба слоя работают внутри контура: ни код, ни имена пакетов
+наружу не уходят.
+
+SAST (Semgrep) и контейнеры (Trivy) **не входят в ядро сервиса** — это
+отдельные слои на будущее, в демо и пилот не заявляются.
+
+## Быстрая проверка
+
+```bash
+scripts/demo.sh
+```
+
+Скрипт собирает Deps и Guardrail, затем прогоняет пять сценариев в Docker с
+`--network none` и сам проверяет результат:
+
+| # | Сценарий | Ожидание |
+|---|---|---|
+| 1 | секрет в PR (`demo/secret-leak`) | Guardrail остановил пайп |
+| 2 | ПДн в PR (`demo/pii-leak`) | Guardrail остановил пайп |
+| 3 | CRITICAL-зависимость (`demo/critical-dependency`) | Deps остановил пайп |
+| 4 | исправление `next` (`demo/fix-next`) | Deps пропустил |
+| 5 | чистый дифф (`demo/fix-next`) | Guardrail пропустил |
+
+Код 0 — все сценарии повели себя как ожидалось. Логи — в `.demo-out/`.
 
 ## Что специально сломано
 
-В `main` намеренно стоит `next 16.3.8` — версия с двумя CRITICAL RCE
-(`GHSA-2464-fhr4-w9xw`, `GHSA-673q-mjm6-r5xr`). Это baseline демо: Deps
-находит 11 уязвимостей и создаёт issue «Зависимости: ежедневный отчёт об
-уязвимостях» — ровно как в живом примере
-[issue #152](https://github.com/sarnas-it/web-sarnas/issues/152).
+- В `main` стоит `next 16.3.8` — версия с CRITICAL RCE
+  (`GHSA-2464-fhr4-w9xw`, `GHSA-673q-mjm6-r5xr`). Это baseline: Deps находит
+  уязвимости и создаёт issue «Зависимости: ежедневный отчёт», как в живом
+  примере [issue #152](https://github.com/sarnas-it/web-sarnas/issues/152).
+- В ветках `demo/*` лежат вымышленные секрет и персональные данные — только
+  для показа гейта. В продакшене так делать нельзя.
 
-> **Не используйте этот репозиторий как шаблон для продакшена.** Уязвимая
-> зависимость и демонстрационный «секрет» лежат здесь намеренно.
+## Как устроен офлайн-режим
 
-## Сценарии демо
+- **Deps** читает подписанный пакет баз `fixtures/osv-dataset/` (`--dataset`):
+  внутри gzip-JSONL с записями OSV и манифест с подписью Ed25519. Сеть не
+  используется; свежесть пакета проверяется (`--max-age`).
+- **Guardrail** работает в раннере и не делает сетевых вызовов: читает дифф
+  через git и применяет правила.
+- Демо запускает оба бинарника в контейнере с `--network none` — это и есть
+  доказательство «наружу ничего не уходит».
 
-| # | Ветка / PR | Что происходит | Ожидаемый результат |
-|---|---|---|---|
-| 1 | `main` | ночной обход Deps | issue с 11 уязвимостями, 2 CRITICAL RCE |
-| 2 | `demo/secret-leak` | в дифф добавлен ключ партнёра | Guardrail — **красный**, merge заблокирован |
-| 3 | `demo/critical-dependency` | добавлен `minimist 1.2.5` | Deps check run — **красный**, CRITICAL |
-| 4 | `demo/fix-next` | `next` обновлён до 16.4.5 | Deps — **зелёный**, CRITICAL больше нет |
-| 5 | дашборд | `https://deps.sarnas.ru:8443` | репозитории, находки, история, стоимость |
-
-Пошаговый сценарий показа — [`docs/05-demo-script.md`](docs/05-demo-script.md).
+Пакет баз в репозитории — демонстрационный (10 записей OSV, ключ подписи
+одноразовый). Для продакшена пакет собирается командой `deps sync` и
+подписывается ключом Sarnas.
 
 ## Структура
 
 ```
 app/                     демо-приложение Next.js (намеренно уязвимая версия)
-lib/                     код, который используется в демо-ветках
-.github/workflows/       security-gate: Guardrail + Semgrep + Trivy
-guardrail.yml            правила Guardrail и исключения
-Dockerfile               для Trivy config scan
-scripts/local-gate.sh    локальный прогон гейта без GitHub Actions
-docs/                    one-pager, план пилота, runbook, 152-ФЗ, сценарий демо
+lib/                     код демо-веток: секрет, ПДн, уязвимая зависимость
+.github/workflows/       security-gate: Guardrail + Deps на self-hosted раннере
+fixtures/osv-dataset/    офлайн-пакет OSV для демо (подписан)
+scripts/demo.sh          самопроверяющееся демо (5 сценариев)
+scripts/build-tools.sh   сборка Deps и Guardrail
+scripts/policy.py        политика block/warn по JSON-отчёту Deps
+guardrail.yml            правила Guardrail и политика block
+Dockerfile               приложение (для полноты, в ядро гейта не входит)
+docs/                    one-pager, план пилота, runbook, 152-ФЗ, сценарий
 ```
 
-## Локальный прогон
-
-Нужны собранные бинарники Deps и Guardrail:
+## Ручной прогон одного слоя
 
 ```bash
-# из соседних репозиториев
-(cd ../repo-review-research/deps && go build -o /tmp/deps ./cmd/deps)
-(cd ../guardrail && go build -o /tmp/guardrail ./cmd/guardrail)
+# SCA офлайн
+.tools/deps scan --repo . --worktree \
+  --dataset fixtures/osv-dataset \
+  --pubkey-hex "$(cat fixtures/osv-dataset/pubkey.hex)" \
+  --max-age 87600h --min-severity HIGH
 
-DEPS_BIN=/tmp/deps GUARDRAIL_BIN=/tmp/guardrail \
-  scripts/local-gate.sh origin/main HEAD
+# секреты/ПДн в диффе
+.tools/guardrail scan --repo . --base main --head demo/secret-leak --config guardrail.yml
 ```
 
-Скрипт печатает единую сводку и возвращает код 1, если есть блокирующие
-находки. Это тот же контракт, что у CI: **упал любой слой — релиз не идёт.**
+Оба возвращают 0/1 по политике: Deps считает блокирующие находки через
+`scripts/policy.py`, Guardrail — сам.
 
 ## Документы пилота
 

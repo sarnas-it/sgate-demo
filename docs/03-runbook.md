@@ -10,9 +10,38 @@ Runbook для инженера внедрения. Все команды вып
 - [ ] платформа: GitHub, GitLab или Jenkins;
 - [ ] решение: SaaS-дашборд или on-prem;
 - [ ] список экосистем (npm, Go, Python, Java, Ruby);
-- [ ] окно на разбор ложных срабатываний в первую неделю.
+- [ ] окно на разбор ложных срабатываний в первую неделю;
+- [ ] машина для сборки офлайн-пакета баз (с интернетом) или доступ к
+      готовому пакету Sarnas.
 
-## 1. GitHub: SCA через Deps
+## 1. Офлайн-пакет баз
+
+Пакет собирается там, где есть интернет, и переносится в контур заказчика.
+
+```bash
+export DEPS_SIGN_KEY=<64 hex-символа, ключ Sarnas>
+deps sync --out ./dataset --ecosystems npm,Go
+```
+
+Получается каталог с `manifest.json`, подписью и gzip-JSONL индексами OSV/БДУ.
+В контуре:
+
+```bash
+deps scan --repo . --worktree \
+  --dataset /opt/sgate/dataset \
+  --max-age 336h \
+  --min-severity HIGH --json /tmp/sca.json
+python3 scripts/policy.py /tmp/sca.json
+```
+
+- `--max-age` — предел свежести; по умолчанию 336 часов (14 суток). Просроченный
+  пакет отвергается, а не считается «уязвимостей нет».
+- Подпись проверяется автоматически; для сборок без вшитого ключа —
+  `--pubkey-hex`.
+- Обновление: раз в сутки/неделю по регламенту, через прокси или перенос
+  файла. Старый пакет сохраняется до успешной замены.
+
+## 2. GitHub: SCA через Deps
 
 1. Установить GitHub App `sarnas-deps-guard` на выбранные репозитории.
 2. Добавить репозитории в `DEPSD_REPOS` на стороне Deps (или в
@@ -21,6 +50,9 @@ Runbook для инженера внедрения. Все команды вып
    `pull_request` доставлено.
 4. Открыть тестовый PR, дождаться комментария и check run.
 5. В branch protection включить обязательный check run Deps.
+
+Для офлайн-режима App работает с пакетом баз на своём хосте; вебхук и check run
+идут через GitHub, а данные о зависимостях — только в локальную базу.
 
 Проверка:
 
@@ -32,10 +64,9 @@ gh pr view <номер> --comments
 Ожидаемо: при CRITICAL/HIGH check run красный, в комментарии — пакет, версия,
 advisory, исправленная версия.
 
-## 2. GitHub: секреты и ПДн через Guardrail
+## 3. GitHub: секреты и ПДн через Guardrail
 
-Скопировать `.github/workflows/security-gate.yml` из демо-репозитория или
-добавить один job:
+Добавить job:
 
 ```yaml
 - uses: actions/checkout@v4
@@ -46,10 +77,21 @@ advisory, исправленная версия.
     base: ${{ github.event.pull_request.base.sha || github.event.before }}
     head: ${{ github.sha }}
     config: guardrail.yml
-    sarif_file: guardrail.sarif
 ```
 
 `fetch-depth: 0` обязателен: Guardrail читает дифф между коммитами.
+
+Для блокировки ПДн, а не предупреждения, в `guardrail.yml`:
+
+```yaml
+severity:
+  phone_ru: block
+  email: block
+  inn_ru: block
+  snils_ru: block
+  passport_ru: block
+  full_name_ru: block
+```
 
 Проверка:
 
@@ -59,39 +101,16 @@ docker run --rm -v "$PWD:/repo" -w /repo \
   scan --repo /repo --base origin/main --head HEAD --config guardrail.yml
 ```
 
-Ожидаемо: exit 1 при найденном секрете; ПДн печатаются как предупреждения.
+Ожидаемо: exit 1 при секрете или ПДн; значения в выводе замаскированы.
 
-## 3. Semgrep (слой пилота)
-
-```bash
-docker run --rm -v "$PWD:/src" -w /src \
-  semgrep/semgrep:1.186.0 \
-  semgrep scan --config auto --metrics=off --sarif --output semgrep.sarif --error
-```
-
-Если политика заказчика запрещает публичные правила — заменить `--config auto`
-на локальный набор правил (`--config ./semgrep-rules`).
-
-## 4. Trivy (контейнеры и IaC)
-
-```bash
-docker run --rm -v "$PWD:/src" -w /src \
-  aquasec/trivy:0.76.2 \
-  config --severity CRITICAL,HIGH --exit-code 1 /src
-```
-
-Для образов:
-
-```bash
-trivy image --severity CRITICAL,HIGH --exit-code 1 <registry>/<image>:<tag>
-```
-
-## 5. Политика и исключения
+## 4. Политика и исключения
 
 Правило по умолчанию:
 
-| Severity | Действие |
+| Находка | Действие |
 |---|---|
+| Секрет | блокировка |
+| ПДн | блокировка |
 | CRITICAL | блокировка |
 | HIGH | блокировка |
 | MODERATE | предупреждение |
@@ -112,15 +131,16 @@ ignore:
 **владелец** и **срок пересмотра**. Исключение без срока удаляется при
 следующем ревью.
 
-## 6. Ежедневный режим
+## 5. Ежедневный режим
 
 - утром проверить issue «Зависимости: ежедневный отчёт об уязвимостях»;
 - новые CRITICAL/HIGH — в работу в тот же день;
 - раз в неделю смотреть метрики: новые находки, закрытые, ложные
   срабатывания, заблокированные PR;
-- раз в две недели пересматривать allowlist.
+- раз в две недели пересматривать allowlist;
+- проверять свежесть офлайн-пакета баз.
 
-## 7. GitLab / Jenkins
+## 6. GitLab / Jenkins
 
 Нативных адаптеров в пилоте нет. Порядок:
 
@@ -129,14 +149,15 @@ ignore:
 
 ```bash
 guardrail scan --repo . --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head "$CI_COMMIT_SHA"
-deps scan --repo . --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head "$CI_COMMIT_SHA" --json deps.json
+deps scan --repo . --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head "$CI_COMMIT_SHA" \
+  --dataset /opt/sgate/dataset --json deps.json
+python3 scripts/policy.py deps.json
 ```
 
-3. Падать на exit code Guardrail и на разборе `deps.json` по политике
-   (см. `scripts/local-gate.sh`).
+3. Падать на exit code Guardrail и на exit code политики Deps.
 4. Публиковать SARIF/JSON как артефакт job.
 
-## 8. Откат
+## 7. Откат
 
 - выключить обязательность check run в branch protection — гейт остаётся в
   режиме отчёта;
@@ -144,18 +165,19 @@ deps scan --repo . --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head "$CI_COMMIT_S
 - убрать репозиторий из списка Deps;
 - ничего не удалять из истории: находки и исключения остаются в отчётах.
 
-## 9. Диагностика
+## 8. Диагностика
 
 | Симптом | Что проверить |
 |---|---|
 | нет check run Deps | App установлен на репозиторий? репозиторий в списке? вебхук доставлен? |
+| Deps пишет «пакет устарел» | дата сборки пакета, `--max-age`, регламент обновления |
+| Deps не видит уязвимость | экосистема есть в пакете? версия пакета в lock-файле? |
 | Guardrail всегда зелёный | `fetch-depth: 0`? правильные base/head? конфиг найден? |
 | Guardrail падает на каждом PR | `ignore.paths`, `severity`, ложные срабатывания |
-| Semgrep не находит ничего | язык поддерживается? правила загрузились? `--config` верный? |
-| Trivy шумит | `--severity`, `.trivyignore`, `--ignore-unfixed` |
+| Секрет в логе | `GUARDRAIL_REVEAL` выключен? маскирование работает? |
 | Дашборд недоступен | DNS-запись, сертификат, Basic auth |
 
-## 10. Контакты и эскалация
+## 9. Контакты и эскалация
 
 - инженер внедрения Sarnas — первый контакт по всем сбоям гейта;
 - владелец политики заказчика — решения block/warn/исключения;
