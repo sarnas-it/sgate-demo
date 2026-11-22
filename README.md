@@ -96,3 +96,4 @@ docs/                    one-pager, план пилота, runbook, 152-ФЗ, с
 - [`docs/04-on-prem-152fz.md`](docs/04-on-prem-152fz.md) — контур данных и 152-ФЗ.
 - [`docs/05-demo-script.md`](docs/05-demo-script.md) — сценарий показа.
 - [`docs/06-open-questions.md`](docs/06-open-questions.md) — что уточнить у Альфы.
+- [`docs/07-report.md`](docs/07-report.md) — что собрано и чем доказано.
