@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "build_at": "2026-11-22T19:58:30.122077573Z",
+  "generator": "deps sync",
+  "attribution": "БДУ ФСТЭК — https://bdu.fstec.ru/ (данные воспроизведены со ссылкой на первоисточник)",
+  "files": [
+    {
+      "name": "osv-npm.jsonl.gz",
+      "sha256": "ce234c356de5e540eb74c7a3bf192c3da78a387db483c0713c476e6f2463854c",
+      "source": "OSV npm (demo fixture)",
+      "size": 5155,
+      "rows": 10
+    }
+  ]
+}
