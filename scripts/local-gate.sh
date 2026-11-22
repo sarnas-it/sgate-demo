@@ -50,7 +50,7 @@ import sys
 path, block = sys.argv[1], set(sys.argv[2].split(","))
 report = json.load(open(path))
 counts = {}
-for package in report.get("vulnerable", []):
+for package in (report.get("vulnerable") or []):
     for advisory in package.get("advisories", []):
         severity = advisory.get("severity", "UNKNOWN")
         counts[severity] = counts.get(severity, 0) + 1
