@@ -8,7 +8,6 @@ severity:
   inn_ru: block
   snils_ru: block
   passport_ru: block
-  full_name_ru: block
 
 ignore:
   paths:
