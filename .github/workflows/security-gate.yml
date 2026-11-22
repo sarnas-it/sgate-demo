@@ -7,16 +7,16 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: security-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Слой 1: секреты и ПДн. Работает в раннере, наружу не ходит.
   secrets:
     name: guardrail (secrets/PII)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, sgate-demo]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,63 +28,33 @@ jobs:
           base: ${{ github.event.pull_request.base.sha || github.event.before }}
           head: ${{ github.sha }}
           config: guardrail.yml
-          sarif_file: guardrail.sarif
 
-      - name: Upload Guardrail SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: guardrail.sarif
-          category: guardrail
-
-  sast:
-    name: semgrep (SAST)
-    runs-on: ubuntu-latest
+  # Слой 2: зависимости. Офлайн-пакет баз, сеть не используется.
+  # На раннере установлен бинарник deps и лежит офлайн-пакет (см. docs/03-runbook.md).
+  sca:
+    name: deps (SCA, offline)
+    runs-on: [self-hosted, linux, sgate-demo]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Слой пилота: правила Semgrep идут из публичного реестра,
-      # код в реестр не отправляется (--metrics=off).
-      - name: Run Semgrep
+      - name: Scan dependencies against offline dataset
         run: |
-          docker run --rm \
-            -v "$PWD:/src" -w /src \
-            semgrep/semgrep:1.186.0 \
-            semgrep scan \
-              --config auto \
-              --metrics=off \
-              --sarif \
-              --output semgrep.sarif \
-              --error \
-              --exclude node_modules \
-              --exclude .next
-
-      - name: Upload Semgrep SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: semgrep.sarif
-          category: semgrep
-
-  containers:
-    name: trivy (containers/IaC)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Trivy config scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: config
-          scan-ref: .
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          format: sarif
-          output: trivy.sarif
-
-      - name: Upload Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy.sarif
-          category: trivy
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE="HEAD~1"
+          fi
+          PUB="$(cat fixtures/osv-dataset/pubkey.hex)"
+          deps scan \
+            --repo . \
+            --base "$BASE" \
+            --head "${{ github.sha }}" \
+            --dataset fixtures/osv-dataset \
+            --pubkey-hex "$PUB" \
+            --max-age 87600h \
+            --min-severity HIGH \
+            --json sca.json \
+            --markdown
+          python3 scripts/policy.py sca.json

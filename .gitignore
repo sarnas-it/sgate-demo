@@ -10,3 +10,8 @@ reports/
 guardrail.sarif
 semgrep.sarif
 trivy.sarif
+
+# demo artifacts
+.demo-worktrees/
+.demo-out/
+.tools/
