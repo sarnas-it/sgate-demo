@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Слой 1: секреты и ПДн. Работает в раннере, наружу не ходит.
+  # Слой 1: секреты и ПДн. Контейнер запускается без сети.
   secrets:
     name: guardrail (secrets/PII)
     runs-on: [self-hosted, linux, sgate-demo]
@@ -23,14 +23,22 @@ jobs:
           fetch-depth: 0
 
       - name: Scan diff for secrets and personal data
-        uses: docker://ghcr.io/sarnas-it/guardrail:v0.1.0
-        with:
-          base: ${{ github.event.pull_request.base.sha || github.event.before }}
-          head: ${{ github.sha }}
-          config: guardrail.yml
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE="HEAD~1"
+          fi
+          docker run --rm --network none \
+            -v "$PWD:/github/workspace" \
+            -w /github/workspace \
+            -e INPUT_BASE="$BASE" \
+            -e INPUT_HEAD="${{ github.sha }}" \
+            -e INPUT_CONFIG=guardrail.yml \
+            ghcr.io/sarnas-it/guardrail:v0.1.0 scan
 
   # Слой 2: зависимости. Офлайн-пакет баз, сеть не используется.
-  # На раннере установлен бинарник deps и лежит офлайн-пакет (см. docs/03-runbook.md).
+  # На раннере установлен бинарник deps (см. docs/03-runbook.md).
   sca:
     name: deps (SCA, offline)
     runs-on: [self-hosted, linux, sgate-demo]
