@@ -61,7 +61,7 @@ scripts/demo.sh
 ```
 app/                     демо-приложение Next.js (намеренно уязвимая версия)
 lib/                     код демо-веток: секрет, ПДн, уязвимая зависимость
-.github/workflows/       security-gate: Guardrail + Deps на self-hosted раннере
+.github/workflows/       security-gate: Guardrail + Deps на GitHub-hosted раннере
 fixtures/osv-dataset/    офлайн-пакет OSV для демо (подписан)
 scripts/demo.sh          самопроверяющееся демо (5 сценариев)
 scripts/build-tools.sh   сборка Deps и Guardrail
