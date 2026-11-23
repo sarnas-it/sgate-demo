@@ -1,0 +1,51 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Semgrep",
+          "rules": [
+            {
+              "id": "sgate-go-command-injection",
+              "properties": { "security-severity": "9.8" }
+            },
+            {
+              "id": "sgate-php-eval",
+              "properties": { "security-severity": "7.5" }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "sgate-go-command-injection",
+          "level": "error",
+          "message": { "text": "Команда из переменной передаётся в shell" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "sast/go/main.go" },
+                "region": { "startLine": 10 }
+              }
+            }
+          ],
+          "partialFingerprints": { "primaryLocationLineHash": "go-1" }
+        },
+        {
+          "ruleId": "sgate-php-eval",
+          "level": "warning",
+          "message": { "text": "eval() выполняет код из переменной" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "sast/php/index.php" },
+                "region": { "startLine": 4 }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

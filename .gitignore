@@ -15,3 +15,6 @@ trivy.sarif
 .demo-worktrees/
 .demo-out/
 .tools/
+
+# test fixture
+!core/testdata/semgrep.sarif

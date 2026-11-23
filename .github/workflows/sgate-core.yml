@@ -1,0 +1,27 @@
+name: sgate-core
+
+on:
+  pull_request:
+    paths:
+      - "core/**"
+      - "docs/adr/**"
+  push:
+    branches: [main]
+    paths:
+      - "core/**"
+      - "docs/adr/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - name: Test and vet
+        run: |
+          cd core
+          go test ./...
+          go vet ./...
