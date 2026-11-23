@@ -91,3 +91,19 @@ jobs:
           print(f"итог: {len(blocking)} блокирующих находок", file=sys.stderr)
           raise SystemExit(1 if blocking else 0)
           PY
+
+  # Слой 3: SAST для Go и PHP. Локальные правила, без сети.
+  sast:
+    name: semgrep (SAST Go/PHP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          docker run --rm --network none \
+            -v "$PWD:/src" \
+            -v "$PWD/sast-rules:/rules:ro" \
+            -w /src \
+            semgrep/semgrep:1.186.0 \
+            semgrep scan --config /rules --error --metrics=off --quiet

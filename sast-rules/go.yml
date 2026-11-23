@@ -1,0 +1,14 @@
+rules:
+  - id: sgate-go-command-injection
+    languages: [go]
+    message: "Команда собирается из переменной и передаётся в shell — возможна инъекция (CWE-78)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("sh", "-c", $CMD)
+          - pattern: exec.Command("bash", "-c", $CMD)
+      - pattern-not: exec.Command("sh", "-c", "...")
+      - pattern-not: exec.Command("bash", "-c", "...")

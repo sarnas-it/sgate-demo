@@ -1,0 +1,28 @@
+rules:
+  - id: sgate-php-eval
+    languages: [php]
+    message: "eval() выполняет код из переменной — возможна инъекция кода (CWE-95)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-95: Code Injection"
+    patterns:
+      - pattern: eval($CODE)
+      - metavariable-pattern:
+          metavariable: $CODE
+          patterns:
+            - pattern-not: '"..."'
+
+  - id: sgate-php-include-request
+    languages: [php]
+    message: "include/require с параметром запроса — возможен path traversal или LFI (CWE-98)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-98: PHP Remote File Inclusion"
+    patterns:
+      - pattern-either:
+          - pattern: include($_GET[$KEY])
+          - pattern: require($_GET[$KEY])
+          - pattern: include($_POST[$KEY])
+          - pattern: require($_POST[$KEY])
