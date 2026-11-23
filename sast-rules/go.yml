@@ -10,5 +10,3 @@ rules:
       - pattern-either:
           - pattern: exec.Command("sh", "-c", $CMD)
           - pattern: exec.Command("bash", "-c", $CMD)
-      - pattern-not: exec.Command("sh", "-c", "...")
-      - pattern-not: exec.Command("bash", "-c", "...")
