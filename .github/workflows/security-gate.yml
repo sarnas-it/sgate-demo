@@ -92,18 +92,20 @@ jobs:
           raise SystemExit(1 if blocking else 0)
           PY
 
-  # Слой 3: SAST для Go и PHP. Локальные правила, без сети.
+  # Слой 3: SAST для любых языков через платформу анализаторов SGATE.
+  # Semgrep, gosec, Bandit и следующие адаптеры — записи в core/analyzers.yaml.
   sast:
-    name: semgrep (SAST Go/PHP)
+    name: sgate (SAST any language)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Semgrep
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - name: Run SGATE analyzers
         run: |
-          docker run --rm --network none \
-            -v "$PWD:/src" \
-            -v "$PWD/sast-rules:/rules:ro" \
-            -w /src \
-            semgrep/semgrep:1.186.0 \
-            semgrep scan --config /rules --error --metrics=off --quiet
+          cd core
+          go run ./cmd/sgate --repo .. --config analyzers.yaml --format text --block high
