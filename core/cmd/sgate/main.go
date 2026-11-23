@@ -38,6 +38,15 @@ func main() {
 	os.Exit(code)
 }
 
+func requiresPresent(repo string, requires []string) bool {
+	for _, rel := range requires {
+		if _, err := os.Stat(filepath.Join(repo, rel)); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, error) {
 	repoAbs, err := filepath.Abs(repo)
 	if err != nil {
@@ -64,6 +73,12 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, er
 	}
 	var selected []config.Analyzer
 	for _, a := range cfg.Analyzers {
+		if !requiresPresent(repoAbs, a.Requires) {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "sgate: analyzer=%s skipped: missing %v\n", a.ID, a.Requires)
+			}
+			continue
+		}
 		for _, l := range a.Languages {
 			if langs[strings.ToLower(l)] {
 				selected = append(selected, a)

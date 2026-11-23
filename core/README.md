@@ -12,8 +12,8 @@ go run ./cmd/sgate --repo .. --config analyzers.yaml --list
 go run ./cmd/sgate --repo .. --config analyzers.yaml --format text
 ```
 
-Сейчас в конфиге Semgrep. Go-специфичный `gosec` — закомментированный пример:
-включается одной записью, без изменения кода.
+Сейчас в конфиге Semgrep (все языки) и gosec (Go, если есть `go.mod`).
+Новый язык — запись в `analyzers.yaml`, код не меняется.
 
 ## Контракт анализатора
 
@@ -53,7 +53,15 @@ analyzers:
 - политика block/warn;
 - тесты на конфиг, языки, SARIF, политику и запуск адаптера.
 
+## Интеграционный тест gosec
+
+Нужен Docker:
+
+```bash
+SGATE_INTEGRATION=1 go test ./internal/analyzer -run TestGosecAdapter -v
+```
+
 ## Дальше по бэклогу
 
-M2: `gosec`, `phpstan`/`psalm`, Bandit, ESLint; каталог версий; baseline;
+M2: `phpstan`/`psalm`, Bandit, ESLint; каталог версий; baseline;
 SARIF upload в GitHub; conformance-тесты для нового адаптера.

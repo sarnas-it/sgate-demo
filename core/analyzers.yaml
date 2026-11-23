@@ -41,13 +41,20 @@ analyzers:
     network: none
     timeout: 10m
 
-  # Пример второго адаптера: включается, когда нужен Go-специфичный gosec.
-  # - id: gosec
-  #   languages: [go]
-  #   runtime: docker
-  #   image: securego/gosec:v2.22.0
-  #   workdir: /src
-  #   command: ["-fmt=sarif", "-out=/out/gosec.sarif", "./..."]
-  #   output: /out/gosec.sarif
-  #   network: none
-  #   timeout: 10m
+  # Go-специфичный адаптер. Включается для репозиториев с go.mod.
+  - id: gosec
+    languages: [go]
+    requires: [go.mod]
+    runtime: docker
+    image: securego/gosec:2.24.6
+    workdir: /src
+    command:
+      - -fmt=sarif
+      - -out=/out/gosec.sarif
+      - ./...
+    env:
+      GOCACHE: /tmp/gocache
+      GOMODCACHE: /tmp/gomodcache
+    output: /out/gosec.sarif
+    network: none
+    timeout: 10m

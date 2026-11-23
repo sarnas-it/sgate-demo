@@ -30,6 +30,9 @@ type Analyzer struct {
 	Network   string            `yaml:"network"`
 	Timeout   string            `yaml:"timeout"`
 	Env       map[string]string `yaml:"env"`
+	// Requires — файлы/каталоги, без которых анализатор не имеет смысла
+	// (например, go.mod для gosec). Проверяются относительно корня репозитория.
+	Requires []string `yaml:"requires"`
 }
 
 // Config — корневой файл analyzers.yaml.
