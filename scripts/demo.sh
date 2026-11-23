@@ -6,10 +6,12 @@
 #   2. ПДн в PR      → Guardrail останавливает пайп;
 #   3. CRITICAL-зависимость → Deps останавливает пайп;
 #   4. исправление   → гейт проходит;
-#   5. чистый дифф   → гейт проходит.
+#   5. чистый дифф   → гейт проходит;
+#   6. Go-код с инъекцией команды → SAST останавливает пайп;
+#   7. PHP-код с eval/LFI → SAST останавливает пайп.
 #
 # Каждый сценарий запускается в Docker с --network none. Сеть нужна только
-# один раз — скачать образ alpine/git и собрать бинарники.
+# один раз — скачать образы и собрать бинарники.
 #
 # Код возврата 0 — все сценарии повели себя как ожидалось, 1 — нет.
 
@@ -20,6 +22,7 @@ cd "$root"
 
 tools="${TOOLS_DIR:-$root/.tools}"
 image="${DEMO_IMAGE:-alpine/git:latest}"
+semgrep_image="${SEMGREP_IMAGE:-semgrep/semgrep:1.186.0}"
 out="$root/.demo-out"
 base="${BASE_REF:-main}"
 
@@ -29,8 +32,13 @@ if [ ! -x "$tools/deps" ] || [ ! -x "$tools/guardrail" ]; then
 fi
 
 if ! docker image inspect "$image" >/dev/null 2>&1; then
-  echo "Скачиваю образ $image (единственный сетевой шаг)."
+  echo "Скачиваю образ $image (сетевой шаг)."
   docker pull "$image" >/dev/null
+fi
+
+if ! docker image inspect "$semgrep_image" >/dev/null 2>&1; then
+  echo "Скачиваю образ $semgrep_image (сетевой шаг)."
+  docker pull "$semgrep_image" >/dev/null
 fi
 
 rm -rf "$out"
@@ -107,20 +115,51 @@ expect_sca() {
   fi
 }
 
-echo "== 1/5 Секрет в PR"
+run_semgrep() {
+  local dir="$1" log="$2"
+  docker run --rm --network none \
+    --user "$docker_user" \
+    -e HOME=/tmp \
+    -v "$dir:/src" \
+    -v "$root/sast-rules:/rules:ro" \
+    -w /src "$semgrep_image" \
+    semgrep scan --config /rules --error --metrics=off --quiet \
+    >"$log" 2>&1
+}
+
+expect_sast_block() {
+  local title="$1" ref="$2" log="$out/$3"
+  local wt="$out/wt-$(echo "$ref" | tr '/' '-')"
+  git worktree add -f "$wt" "$ref" >/dev/null 2>&1
+  if run_semgrep "$wt" "$log"; then
+    results+=("FAIL | $title | SAST пропустил")
+    failures=$((failures + 1))
+  else
+    results+=("ok   | $title | SAST остановил пайп")
+  fi
+  git worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"
+}
+
+echo "== 1/7 Секрет в PR"
 expect_block_secrets "Секрет в PR" "demo/secret-leak" "secret.log"
 
-echo "== 2/5 ПДн в PR"
+echo "== 2/7 ПДн в PR"
 expect_block_secrets "ПДн в PR" "demo/pii-leak" "pii.log"
 
-echo "== 3/5 CRITICAL-зависимость"
+echo "== 3/7 CRITICAL-зависимость"
 expect_sca "CRITICAL-зависимость" "demo/critical-dependency" "block" "sca-critical.json" "sca-critical.log"
 
-echo "== 4/5 Исправление зависимости"
+echo "== 4/7 Исправление зависимости"
 expect_sca "Исправление next" "demo/fix-next" "pass" "sca-fix.json" "sca-fix.log"
 
-echo "== 5/5 Чистый дифф"
+echo "== 5/7 Чистый дифф"
 expect_pass_secrets "Чистый дифф" "demo/fix-next" "clean.log"
+
+echo "== 6/7 SAST: Go"
+expect_sast_block "SAST: Go command injection" "demo/sast-go" "sast-go.log"
+
+echo "== 7/7 SAST: PHP"
+expect_sast_block "SAST: PHP eval/LFI" "demo/sast-php" "sast-php.log"
 
 echo
 echo "=== Результаты"
