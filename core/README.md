@@ -12,7 +12,7 @@ go run ./cmd/sgate --repo .. --config analyzers.yaml --list
 go run ./cmd/sgate --repo .. --config analyzers.yaml --format text
 ```
 
-Сейчас в конфиге Semgrep (все языки) и gosec (Go, если есть `go.mod`).
+Сейчас в конфиге Semgrep (все языки), gosec (Go, если есть `go.mod`) и Bandit (Python, JSON → общая модель).
 Новый язык — запись в `analyzers.yaml`, код не меняется.
 
 ## Контракт анализатора
@@ -53,12 +53,12 @@ analyzers:
 - политика block/warn;
 - тесты на конфиг, языки, SARIF, политику и запуск адаптера.
 
-## Интеграционный тест gosec
+## Интеграционные тесты адаптеров
 
 Нужен Docker:
 
 ```bash
-SGATE_INTEGRATION=1 go test ./internal/analyzer -run TestGosecAdapter -v
+SGATE_INTEGRATION=1 go test ./internal/analyzer -run 'Test(Bandit|Gosec)Adapter' -v
 ```
 
 ## Дальше по бэклогу

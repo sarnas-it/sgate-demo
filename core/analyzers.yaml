@@ -41,6 +41,25 @@ analyzers:
     network: none
     timeout: 10m
 
+  # Python-адаптер: Bandit умеет JSON, SGATE нормализует его в общую модель.
+  - id: bandit
+    languages: [python]
+    runtime: docker
+    image: cytopia/bandit:1
+    workdir: /src
+    command:
+      - -r
+      - .
+      - -f
+      - json
+      - -o
+      - /out/bandit.json
+      - -q
+    output: /out/bandit.json
+    format: bandit-json
+    network: none
+    timeout: 10m
+
   # Go-специфичный адаптер. Включается для репозиториев с go.mod.
   - id: gosec
     languages: [go]

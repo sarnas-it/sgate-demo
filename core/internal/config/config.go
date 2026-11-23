@@ -33,6 +33,8 @@ type Analyzer struct {
 	// Requires — файлы/каталоги, без которых анализатор не имеет смысла
 	// (например, go.mod для gosec). Проверяются относительно корня репозитория.
 	Requires []string `yaml:"requires"`
+	// Format — формат вывода: sarif (по умолчанию) или bandit-json.
+	Format string `yaml:"format"`
 }
 
 // Config — корневой файл analyzers.yaml.
@@ -93,6 +95,14 @@ func Load(path string) (*Config, error) {
 		}
 		if a.Network == "" {
 			a.Network = "none"
+		}
+		if a.Format == "" {
+			a.Format = "sarif"
+		}
+		switch a.Format {
+		case "sarif", "bandit-json":
+		default:
+			return nil, fmt.Errorf("%s: unsupported format %q", a.ID, a.Format)
 		}
 	}
 	return &c, nil

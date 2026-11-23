@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "filename": "./app.py",
+      "line_number": 5,
+      "issue_severity": "HIGH",
+      "issue_confidence": "HIGH",
+      "test_id": "B602",
+      "issue_text": "subprocess call with shell=True identified"
+    },
+    {
+      "filename": "app.py",
+      "line_number": 8,
+      "issue_severity": "MEDIUM",
+      "test_id": "B307",
+      "issue_text": "Use of possibly insecure function"
+    }
+  ]
+}

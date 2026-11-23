@@ -33,6 +33,9 @@ analyzers:
 	if c.Analyzers[0].Timeout != "10m" {
 		t.Fatalf("default timeout = %q", c.Analyzers[0].Timeout)
 	}
+	if c.Analyzers[0].Format != "sarif" {
+		t.Fatalf("default format = %q", c.Analyzers[0].Format)
+	}
 }
 
 func TestLoadRejectsDuplicate(t *testing.T) {

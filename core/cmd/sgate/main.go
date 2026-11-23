@@ -114,7 +114,7 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, er
 			failed = append(failed, spec.ID)
 			continue
 		}
-		got, err := sarif.Parse(path, spec.ID)
+		got, err := sarif.ParseFile(path, spec.ID, spec.Format)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sgate: %s: %v\n", spec.ID, err)
 			failed = append(failed, spec.ID)

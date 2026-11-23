@@ -82,6 +82,18 @@ type region struct {
 	StartLine int `json:"startLine"`
 }
 
+// ParseFile читает вывод анализатора в формате format.
+func ParseFile(file, analyzerID, format string) ([]Finding, error) {
+	switch format {
+	case "", "sarif":
+		return Parse(file, analyzerID)
+	case "bandit-json":
+		return ParseBanditJSON(file, analyzerID)
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
+	}
+}
+
 // Parse читает SARIF-файл и возвращает находки. Пустой runs/results — не ошибка.
 func Parse(file, analyzerID string) ([]Finding, error) {
 	raw, err := os.ReadFile(file)
@@ -202,6 +214,60 @@ func toFloat(v any) (float64, bool) {
 	}
 }
 
+type banditReport struct {
+	Results []struct {
+		Filename      string `json:"filename"`
+		LineNumber    int    `json:"line_number"`
+		IssueSeverity string `json:"issue_severity"`
+		TestID        string `json:"test_id"`
+		IssueText     string `json:"issue_text"`
+	} `json:"results"`
+}
+
+// ParseBanditJSON читает JSON Bandit (флаг -f json).
+func ParseBanditJSON(file, analyzerID string) ([]Finding, error) {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("read bandit json: %w", err)
+	}
+	var r banditReport
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return nil, fmt.Errorf("parse bandit json: %w", err)
+	}
+	out := make([]Finding, 0, len(r.Results))
+	for _, res := range r.Results {
+		f := Finding{
+			Analyzer: analyzerID,
+			RuleID:   res.TestID,
+			Severity: severityFromBandit(res.IssueSeverity),
+			Message:  res.IssueText,
+			File:     cleanPath(res.Filename),
+			Line:     res.LineNumber,
+		}
+		f.Fingerprint = hashFingerprint(f.Analyzer, f.RuleID, f.File, strconv.Itoa(f.Line), f.Message)
+		out = append(out, f)
+	}
+	return out, nil
+}
+
+func severityFromBandit(s string) string {
+	switch strings.ToUpper(s) {
+	case "HIGH":
+		return "high"
+	case "MEDIUM":
+		return "medium"
+	case "LOW":
+		return "low"
+	default:
+		return "info"
+	}
+}
+
+func hashFingerprint(parts ...string) string {
+	sum := sha1.Sum([]byte(strings.Join(parts, "|")))
+	return hex.EncodeToString(sum[:])
+}
+
 func fingerprint(res result, analyzerID, file string, line int) string {
 	for _, m := range []map[string]string{res.PartialFingerprints, res.Fingerprints} {
 		for _, key := range []string{"primaryLocationLineHash", "matchBasedId/v1"} {
@@ -210,6 +276,5 @@ func fingerprint(res result, analyzerID, file string, line int) string {
 			}
 		}
 	}
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s|%s|%s|%d|%s", analyzerID, res.RuleID, file, line, res.Message.Text)))
-	return hex.EncodeToString(sum[:])
+	return hashFingerprint(analyzerID, res.RuleID, file, strconv.Itoa(line), res.Message.Text)
 }
