@@ -16,7 +16,7 @@ jobs:
   # Слой 1: секреты и ПДн. Контейнер запускается без сети.
   secrets:
     name: guardrail (secrets/PII)
-    runs-on: [self-hosted, linux, sgate-demo]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,14 +38,23 @@ jobs:
             ghcr.io/sarnas-it/guardrail:v0.1.0 scan
 
   # Слой 2: зависимости. Офлайн-пакет баз, сеть не используется.
-  # На раннере установлен бинарник deps (см. docs/03-runbook.md).
   sca:
     name: deps (SCA, offline)
-    runs-on: [self-hosted, linux, sgate-demo]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Download deps binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download demo-tools-v1 \
+            --repo sarnas-it/sgate-demo \
+            --pattern deps-linux-amd64 \
+            --dir "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/deps-linux-amd64"
 
       - name: Scan dependencies against offline dataset
         run: |
@@ -55,7 +64,7 @@ jobs:
             BASE="HEAD~1"
           fi
           PUB="$(cat fixtures/osv-dataset/pubkey.hex)"
-          deps scan \
+          "$RUNNER_TEMP/deps-linux-amd64" scan \
             --repo . \
             --base "$BASE" \
             --head "${{ github.sha }}" \
@@ -63,6 +72,22 @@ jobs:
             --pubkey-hex "$PUB" \
             --max-age 87600h \
             --min-severity HIGH \
-            --json sca.json \
+            --json "$RUNNER_TEMP/sca.json" \
             --markdown
-          python3 scripts/policy.py sca.json
+
+          # Политика встроена в workflow и не берётся из PR: публичный PR
+          # не должен иметь возможности подменить проверку.
+          python3 - "$RUNNER_TEMP/sca.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1]))
+          blocking = [
+              (p.get("name"), p.get("version"), a.get("severity"), a.get("id"))
+              for p in (report.get("vulnerable") or [])
+              for a in (p.get("advisories") or [])
+              if a.get("severity") in {"CRITICAL", "HIGH"}
+          ]
+          for name, version, severity, advisory in blocking:
+              print(f"[BLOCK] {name} {version} — {severity} — {advisory}")
+          print(f"итог: {len(blocking)} блокирующих находок", file=sys.stderr)
+          raise SystemExit(1 if blocking else 0)
+          PY
