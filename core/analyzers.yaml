@@ -1,0 +1,53 @@
+version: 1
+
+# Контракт анализатора: SGATE запускает команду/образ и читает SARIF.
+# Новый язык = новый адаптер в этом файле, код SGATE не меняется.
+analyzers:
+  - id: semgrep
+    languages:
+      - go
+      - php
+      - javascript
+      - typescript
+      - python
+      - java
+      - ruby
+      - rust
+      - c
+      - cpp
+      - csharp
+      - kotlin
+      - swift
+      - scala
+    runtime: docker
+    image: semgrep/semgrep:1.186.0
+    workdir: /src
+    command:
+      - semgrep
+      - scan
+      - --config
+      - /rules
+      - --sarif
+      - --output
+      - /out/semgrep.sarif
+      - --error
+      - --metrics=off
+      - --quiet
+    mounts:
+      - source: ../sast-rules
+        target: /rules
+        read_only: true
+    output: /out/semgrep.sarif
+    network: none
+    timeout: 10m
+
+  # Пример второго адаптера: включается, когда нужен Go-специфичный gosec.
+  # - id: gosec
+  #   languages: [go]
+  #   runtime: docker
+  #   image: securego/gosec:v2.22.0
+  #   workdir: /src
+  #   command: ["-fmt=sarif", "-out=/out/gosec.sarif", "./..."]
+  #   output: /out/gosec.sarif
+  #   network: none
+  #   timeout: 10m
