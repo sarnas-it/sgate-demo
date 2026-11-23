@@ -42,6 +42,7 @@ if ! docker image inspect "$semgrep_image" >/dev/null 2>&1; then
 fi
 
 rm -rf "$out"
+git worktree prune >/dev/null 2>&1 || true
 mkdir -p "$out"
 
 pubkey="$(cat fixtures/osv-dataset/pubkey.hex)"
