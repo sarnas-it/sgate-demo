@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"code.sarnas.ru/sgate/internal/analyzer"
+	"code.sarnas.ru/sgate/internal/baseline"
 	"code.sarnas.ru/sgate/internal/config"
 	"code.sarnas.ru/sgate/internal/detect"
 	"code.sarnas.ru/sgate/internal/policy"
@@ -26,9 +27,11 @@ func main() {
 	list := flag.Bool("list", false, "показать анализаторы и выйти")
 	keep := flag.Bool("keep", false, "не удалять временные SARIF")
 	verbose := flag.Bool("v", false, "печатать выбранные анализаторы")
+	baselinePath := flag.String("baseline", "", "файл принятых находок")
+	writeBaseline := flag.String("write-baseline", "", "записать текущие находки как принятые")
 	flag.Parse()
 
-	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose)
+	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose, *baselinePath, *writeBaseline)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sgate:", err)
 		if code == 0 {
@@ -36,6 +39,16 @@ func main() {
 		}
 	}
 	os.Exit(code)
+}
+
+func countBaseline(findings []sarif.Finding) int {
+	n := 0
+	for _, f := range findings {
+		if f.Baseline {
+			n++
+		}
+	}
+	return n
 }
 
 func requiresPresent(repo string, requires []string) bool {
@@ -47,7 +60,7 @@ func requiresPresent(repo string, requires []string) bool {
 	return true
 }
 
-func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, error) {
+func run(repo, cfgPath, format, block string, list, keep, verbose bool, baselinePath, writeBaseline string) (int, error) {
 	repoAbs, err := filepath.Abs(repo)
 	if err != nil {
 		return 2, err
@@ -126,6 +139,21 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, er
 		return 2, fmt.Errorf("все анализаторы завершились ошибкой: %s", strings.Join(failed, ", "))
 	}
 
+	if baselinePath != "" {
+		b, err := baseline.Load(baselinePath)
+		if err != nil {
+			return 2, err
+		}
+		for i := range findings {
+			findings[i].Baseline = b.Match(findings[i])
+		}
+	}
+	if writeBaseline != "" {
+		if err := baseline.Save(writeBaseline, findings); err != nil {
+			return 2, fmt.Errorf("write baseline: %w", err)
+		}
+	}
+
 	sort.SliceStable(findings, func(i, j int) bool {
 		if policy.Rank(findings[i].Severity) != policy.Rank(findings[j].Severity) {
 			return policy.Rank(findings[i].Severity) > policy.Rank(findings[j].Severity)
@@ -155,13 +183,15 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool) (int, er
 	} else {
 		for _, f := range findings {
 			mark := "warn "
-			if policy.Rank(f.Severity) >= policy.Rank(block) {
+			if f.Baseline {
+				mark = "base "
+			} else if policy.Rank(f.Severity) >= policy.Rank(block) {
 				mark = "BLOCK"
 			}
 			fmt.Printf("[%s] %s:%d %s %s — %s\n", mark, f.File, f.Line, f.Severity, f.RuleID, f.Message)
 		}
-		fmt.Fprintf(os.Stderr, "итог: %d находок, %d блокирующих, анализаторов %d, ошибок %d\n",
-			len(findings), len(blocking), len(selected)-len(failed), len(failed))
+		fmt.Fprintf(os.Stderr, "итог: %d находок, %d baseline, %d блокирующих, анализаторов %d, ошибок %d\n",
+			len(findings), countBaseline(findings), len(blocking), len(selected)-len(failed), len(failed))
 	}
 	if len(blocking) > 0 {
 		return 1, nil

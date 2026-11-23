@@ -21,6 +21,7 @@ type Finding struct {
 	File        string `json:"file"`
 	Line        int    `json:"line"`
 	Fingerprint string `json:"fingerprint"`
+	Baseline    bool   `json:"baseline,omitempty"`
 }
 
 type report struct {

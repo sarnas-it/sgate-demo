@@ -25,6 +25,9 @@ func Blocking(findings []sarif.Finding, threshold string) []sarif.Finding {
 	limit := Rank(threshold)
 	out := make([]sarif.Finding, 0, len(findings))
 	for _, f := range findings {
+		if f.Baseline {
+			continue
+		}
 		if Rank(f.Severity) >= limit {
 			out = append(out, f)
 		}

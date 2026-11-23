@@ -51,7 +51,24 @@ analyzers:
 - оркестратор с таймаутами; адаптеры запускаются последовательно в M1;
 - нормализация SARIF в единую модель (severity по CVSS и уровню);
 - политика block/warn;
+- baseline/fingerprint: старые находки не блокируют новые PR;
 - тесты на конфиг, языки, SARIF, политику и запуск адаптера.
+
+## Baseline
+
+Принять текущие находки, чтобы они не блокировали PR:
+
+```bash
+go run ./cmd/sgate --repo .. --config analyzers.yaml \
+  --write-baseline .sgate-baseline.json
+
+go run ./cmd/sgate --repo .. --config analyzers.yaml \
+  --baseline .sgate-baseline.json
+```
+
+Baseline матчится по fingerprint анализатора; если его нет — по
+`analyzer + rule + file + message`. Принятые находки печатаются как `[base ]`
+и не блокируют.
 
 ## Интеграционные тесты адаптеров
 

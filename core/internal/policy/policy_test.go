@@ -19,4 +19,8 @@ func TestBlocking(t *testing.T) {
 	if got := len(Blocking(f, "medium")); got != 3 {
 		t.Fatalf("blocking medium = %d", got)
 	}
+	f[0].Baseline = true
+	if got := len(Blocking(f, "critical")); got != 0 {
+		t.Fatalf("baseline finding must not block, got %d", got)
+	}
 }
