@@ -1,7 +1,6 @@
 # Sarnas Security Gate — демо
 
-Самопроверяющееся демо сервиса **Security Gate** (проект SGATE, заказчик —
-АльфаСтрахование). Показывает два слоя, которые входят в сервис:
+Самопроверяющееся демо сервиса **Security Gate** (проект SGATE). Показывает два слоя, которые входят в сервис:
 
 | Слой | Продукт | Что проверяет | Блокирует | Сеть |
 |---|---|---|---|---|
@@ -90,10 +89,10 @@ docs/                    one-pager, план пилота, runbook, 152-ФЗ, с
 
 ## Документы пилота
 
-- [`docs/01-one-pager.md`](docs/01-one-pager.md) — что предлагаем Альфе.
+- [`docs/01-one-pager.md`](docs/01-one-pager.md) — что предлагаем.
 - [`docs/02-pilot-plan.md`](docs/02-pilot-plan.md) — 3 недели, роли, критерии.
 - [`docs/03-runbook.md`](docs/03-runbook.md) — как включить гейт у клиента.
 - [`docs/04-on-prem-152fz.md`](docs/04-on-prem-152fz.md) — контур данных и 152-ФЗ.
 - [`docs/05-demo-script.md`](docs/05-demo-script.md) — сценарий показа.
-- [`docs/06-open-questions.md`](docs/06-open-questions.md) — что уточнить у Альфы.
+- [`docs/06-open-questions.md`](docs/06-open-questions.md) — что уточнить.
 - [`docs/07-report.md`](docs/07-report.md) — что собрано и чем доказано.
