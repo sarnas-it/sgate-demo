@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -39,6 +40,39 @@ func main() {
 		}
 	}
 	os.Exit(code)
+}
+
+func filterExcluded(findings []sarif.Finding, patterns []string) []sarif.Finding {
+	if len(patterns) == 0 {
+		return findings
+	}
+	out := findings[:0]
+	for _, f := range findings {
+		if !isExcluded(f.File, patterns) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func isExcluded(file string, patterns []string) bool {
+	file = filepath.ToSlash(file)
+	for _, p := range patterns {
+		p = strings.TrimSpace(filepath.ToSlash(p))
+		if p == "" {
+			continue
+		}
+		if strings.HasSuffix(p, "/**") {
+			if strings.HasPrefix(file, strings.TrimSuffix(p, "/**")+"/") {
+				return true
+			}
+			continue
+		}
+		if ok, _ := path.Match(p, file); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func countBaseline(findings []sarif.Finding) int {
@@ -139,6 +173,7 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 		return 2, fmt.Errorf("все анализаторы завершились ошибкой: %s", strings.Join(failed, ", "))
 	}
 
+	findings = filterExcluded(findings, cfg.Exclude)
 	if baselinePath != "" {
 		b, err := baseline.Load(baselinePath)
 		if err != nil {

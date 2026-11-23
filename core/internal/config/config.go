@@ -41,6 +41,8 @@ type Analyzer struct {
 type Config struct {
 	Version   int        `yaml:"version"`
 	Analyzers []Analyzer `yaml:"analyzers"`
+	// Exclude — пути, которые не считаются находками (fixtures, testdata).
+	Exclude []string `yaml:"exclude"`
 }
 
 // Load читает и валидирует конфиг.
