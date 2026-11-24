@@ -64,6 +64,25 @@ analyzers:
     network: none
     timeout: 10m
 
+  # PHP-адаптер: Psalm умеет SARIF, но возвращает 2 при находках.
+  - id: psalm
+    languages: [php]
+    requires: [psalm.xml]
+    runtime: docker
+    image: ghcr.io/psalm/psalm:latest
+    entrypoint: psalm
+    workdir: /src
+    command:
+      - --no-cache
+      - --output-format=sarif
+      - --taint-analysis
+    output: /out/psalm.sarif
+    capture_stdout: true
+    format: sarif
+    exit_codes: [0, 1, 2]
+    network: none
+    timeout: 10m
+
   # Go-специфичный адаптер. Включается для репозиториев с go.mod.
   - id: gosec
     languages: [go]

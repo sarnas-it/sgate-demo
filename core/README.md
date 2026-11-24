@@ -12,7 +12,7 @@ go run ./cmd/sgate --repo .. --config analyzers.yaml --list
 go run ./cmd/sgate --repo .. --config analyzers.yaml --format text
 ```
 
-Сейчас в конфиге Semgrep (все языки), gosec (Go, если есть `go.mod`) и Bandit (Python, JSON → общая модель).
+Сейчас в конфиге Semgrep (все языки), gosec (Go, если есть `go.mod`), Bandit (Python, JSON) и Psalm (PHP, SARIF + taint).
 Новый язык — запись в `analyzers.yaml`, код не меняется.
 
 ## Контракт анализатора
@@ -76,7 +76,7 @@ Baseline матчится по fingerprint анализатора; если ег
 Нужен Docker:
 
 ```bash
-SGATE_INTEGRATION=1 go test ./internal/analyzer -run 'Test(Bandit|Gosec)Adapter' -v
+SGATE_INTEGRATION=1 go test ./internal/analyzer -run 'Test(Bandit|Gosec|Psalm)Adapter' -v
 ```
 
 ## Дальше по бэклогу
