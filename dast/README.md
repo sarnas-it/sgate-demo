@@ -117,6 +117,16 @@ go run ./cmd/sgatedast scan -scope ../dast/scope.example.yaml \
 
 На Juice Shop: feroxbuster нашёл 5 путей (info), nuclei high/critical — 0.
 
+## Политика TaskTracker
+
+```bash
+go run ./cmd/sgatedast report -findings dast/out/findings.jsonl \
+  -out dast/out -target http://127.0.0.1:18081 \
+  -policy dast/policy.tasktracker.yaml
+```
+
+Текущие medium — warn; новые high/critical — block; исключения только с owner/expires.
+
 ## Политика
 
 ```bash
