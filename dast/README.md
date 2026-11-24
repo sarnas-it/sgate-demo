@@ -53,6 +53,18 @@ DAST_TOKEN=... go run ./cmd/sgatedast scan ... -id nuclei
 `cookie` → `Cookie: …`. Если auth нет, `-H` из команды сканера убирается.
 Только тестовые учётки, только стенд. Матрица ролей — `dast/auth.md`.
 
+## Passive WSTG
+
+```bash
+cd core
+go run ./cmd/sgatedast passive -scope ../dast/scope.example.yaml \
+  -out ../dast/out/passive.json
+```
+
+Проверяет заголовки, cookies и открытые служебные файлы. Без payload'ов.
+На Juice Shop: CSP/Referrer-Policy/Permissions-Policy, 0 блокирующих; `.env`
+на SPA не считается открытым, если ответ — HTML.
+
 ## Discovery целей
 
 ```bash

@@ -24,7 +24,15 @@
 
 Проверка: `curl -I http://127.0.0.1:3000` → 200.
 
-## 3. Discovery
+## 3. Passive WSTG
+
+```bash
+cd core
+go run ./cmd/sgatedast passive -scope ../dast/scope.yaml \
+  -out ../dast/out/passive.json
+```
+
+## 4. Discovery
 
 ```bash
 cd core
@@ -33,7 +41,7 @@ go run ./cmd/sgatedast discover \
   -out ../dast/out/urls.txt
 ```
 
-## 4. ZAP baseline
+## 5. ZAP baseline
 
 ```bash
 DAST_CONFIRM=1 go run ./cmd/sgatedast scan \
@@ -42,7 +50,7 @@ DAST_CONFIRM=1 go run ./cmd/sgatedast scan \
   -id zap-baseline -policy ../dast/policy.yaml -out ../dast/out
 ```
 
-## 5. Auth и full scan (B5+)
+## 6. Auth и full scan (B5+)
 
 ```bash
 DAST_TOKEN=... DAST_CONFIRM=1 go run ./cmd/sgatedast scan ... -id zap-full
@@ -50,14 +58,14 @@ DAST_TOKEN=... DAST_CONFIRM=1 go run ./cmd/sgatedast scan ... -id zap-full
 
 Только тестовые учётки. Матрица ролей — `dast/auth.md`.
 
-## 6. Дополнительные сканеры
+## 7. Дополнительные сканеры
 
 ```bash
 go run ./cmd/sgatedast scan ... -id nuclei ...
 go run ./cmd/sgatedast scan ... -id feroxbuster ...
 ```
 
-## 7. Триаж
+## 8. Триаж
 
 | Severity | Действие | Срок |
 |---|---|---|
@@ -68,7 +76,7 @@ go run ./cmd/sgatedast scan ... -id feroxbuster ...
 
 FP оформляется как исключение в `dast/policy.yaml`: rule/path, owner, expires, reason.
 
-## 8. Отчёт
+## 9. Отчёт
 
 `dast/out/report.md`:
 
@@ -78,7 +86,7 @@ FP оформляется как исключение в `dast/policy.yaml`: rul
 
 Отчёт не является пентестом и не гарантирует отсутствие уязвимостей.
 
-## 9. Метрики
+## 10. Метрики
 
 - находок по severity;
 - подтверждённых и FP;
@@ -86,7 +94,7 @@ FP оформляется как исключение в `dast/policy.yaml`: rul
 - заблокированных релизов;
 - покрытие WSTG.
 
-## 10. Откат
+## 11. Откат
 
 ```bash
 ./dast/stand-down.sh

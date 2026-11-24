@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -26,6 +27,8 @@ func main() {
 		runDiscover(os.Args[2:])
 	case "scan":
 		runScan(os.Args[2:])
+	case "passive":
+		runPassive(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -66,6 +69,44 @@ func runDiscover(args []string) {
 		if err := os.WriteFile(*out, b, 0o644); err != nil {
 			fail(err)
 		}
+	}
+}
+
+func runPassive(args []string) {
+	fs := flag.NewFlagSet("passive", flag.ExitOnError)
+	scopePath := fs.String("scope", "dast/scope.example.yaml", "путь к scope")
+	out := fs.String("out", "dast/out/passive.json", "JSON-отчёт")
+	block := fs.String("block", "high", "порог блокировки")
+	fs.Parse(args)
+
+	scope, err := dast.Load(*scopePath)
+	if err != nil {
+		fail(err)
+	}
+	client := &http.Client{Timeout: 20 * time.Second}
+	findings, err := dast.PassiveScan(context.Background(), client, scope)
+	if err != nil {
+		fail(err)
+	}
+	findings = dast.Dedup(findings)
+	blocking := policy.Blocking(findings, *block)
+	for _, f := range findings {
+		mark := "warn "
+		if policy.Rank(f.Severity) >= policy.Rank(*block) {
+			mark = "BLOCK"
+		}
+		fmt.Printf("[%s] %s %s %s — %s\n", mark, f.File, f.Severity, f.RuleID, f.Message)
+	}
+	if err := os.MkdirAll(filepath.Dir(*out), 0o755); err != nil {
+		fail(err)
+	}
+	b, _ := json.MarshalIndent(findings, "", "  ")
+	if err := os.WriteFile(*out, append(b, '\n'), 0o644); err != nil {
+		fail(err)
+	}
+	fmt.Fprintf(os.Stderr, "итог passive: %d находок, %d блокирующих, отчёт: %s\n", len(findings), len(blocking), *out)
+	if len(blocking) > 0 {
+		os.Exit(1)
 	}
 }
 
