@@ -14,7 +14,7 @@ scanners:
       - -w
       - report.md
       - -I
-    output: report.json
+    output: /zap/wrk/report.json
     format: zap-json
     network: host
     timeout: 10m
