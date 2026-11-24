@@ -1,0 +1,18 @@
+id: sgate-missing-csp
+
+info:
+  name: Missing Content-Security-Policy
+  author: sarnas
+  severity: medium
+  tags: sgate,headers,misconfig
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Content-Security-Policy"
+        negative: true

@@ -1,0 +1,66 @@
+name: dast
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - name: Start isolated stand
+        run: |
+          docker run -d --rm --name sgate-dast-stand \
+            -p 127.0.0.1:3000:3000 \
+            bkimminich/juice-shop@sha256:9bbaecc41791f00b002bc65931cc5ff355fbdb941fa72b06558c18dace43197b
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/; then exit 0; fi
+            sleep 2
+          done
+          echo "stand did not start" >&2
+          exit 1
+
+      - name: Run DAST
+        run: |
+          set -euo pipefail
+          cat > /tmp/scope-dast.yaml <<'YAML'
+          target: http://127.0.0.1:3000
+          allowed_hosts: [127.0.0.1]
+          max_rps: 2
+          YAML
+          mkdir -p dast/out
+          rm -f dast/out/findings.jsonl
+          cd core
+          DAST_CONFIRM=1 go run ./cmd/sgatedast passive \
+            -scope /tmp/scope-dast.yaml -out ../dast/out/passive.json \
+            -findings-out ../dast/out/findings.jsonl
+          DAST_CONFIRM=1 go run ./cmd/sgatedast scan \
+            -scope /tmp/scope-dast.yaml -scanners ../dast/scanners.yaml \
+            -id zap-baseline -policy ../dast/policy.yaml \
+            -out ../dast/out -findings-out ../dast/out/findings.jsonl -confirm
+          go run ./cmd/sgatedast report \
+            -findings ../dast/out/findings.jsonl -out ../dast/out \
+            -target http://127.0.0.1:3000 -policy ../dast/policy.yaml
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: dast/out/report.sarif
+          category: dast
+
+      - name: Stop stand
+        if: always()
+        run: docker rm -f sgate-dast-stand || true

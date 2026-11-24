@@ -69,6 +69,36 @@ scanners:
     timeout: 10m
     exit_codes: [0, 1, 2]
 
+  - id: nuclei-offline
+    image: projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb
+    workdir: /out
+    env:
+      HOME: /tmp
+      XDG_CONFIG_HOME: /tmp/.config
+    command:
+      - -u
+      - "{{target}}"
+      - -t
+      - /templates/sgate-missing-csp.yaml
+      - -t
+      - /templates/sgate-exposed-env.yaml
+      - -jsonl
+      - -o
+      - /out/nuclei-offline.jsonl
+      - -silent
+      - -no-color
+      - -duc
+      - -ni
+    mounts:
+      - source: nuclei-templates
+        target: /templates
+        read_only: true
+    output: /out/nuclei-offline.jsonl
+    format: nuclei-jsonl
+    network: host
+    timeout: 5m
+    exit_codes: [0, 1, 2]
+
   - id: feroxbuster-tt
     image: epi052/feroxbuster@sha256:ed41806cb9c45bdc01cc8767b68fd47027025570eac8dc2605a024a43a97a873
     workdir: /out
