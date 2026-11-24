@@ -78,6 +78,7 @@ func runScan(args []string) {
 	block := fs.String("block", "high", "порог блокировки, если нет policy")
 	policyPath := fs.String("policy", "", "путь к dast/policy.yaml")
 	confirm := fs.Bool("confirm", false, "подтвердить согласованный стенд")
+	reportPath := fs.String("report", "", "путь к markdown-отчёту (по умолчанию out/report.md)")
 	fs.Parse(args)
 
 	if !*confirm && os.Getenv("DAST_CONFIRM") != "1" {
@@ -149,12 +150,17 @@ func runScan(args []string) {
 	sort.SliceStable(findings, func(i, j int) bool {
 		return policy.Rank(findings[i].Severity) > policy.Rank(findings[j].Severity)
 	})
-	var blocking []sarif.Finding
+	var blocking, warnings []sarif.Finding
 	excepted := 0
 	if dastPolicy != nil {
-		blocking, _, excepted = dastPolicy.Evaluate(findings)
+		blocking, warnings, excepted = dastPolicy.Evaluate(findings)
 	} else {
 		blocking = policy.Blocking(findings, *block)
+		for _, f := range findings {
+			if policy.Rank(f.Severity) < policy.Rank(*block) {
+				warnings = append(warnings, f)
+			}
+		}
 	}
 	for _, f := range findings {
 		mark := "warn "
@@ -166,6 +172,18 @@ func runScan(args []string) {
 			mark = "BLOCK"
 		}
 		fmt.Printf("[%s] %s %s %s — %s\n", mark, f.File, f.Severity, f.RuleID, f.Message)
+	}
+	report := *reportPath
+	if report == "" {
+		report = filepath.Join(*outDir, "report.md")
+	}
+	if f, err := os.Create(report); err == nil {
+		_ = dast.WriteMarkdown(f, dast.Report{
+			Target: scope.Target, Scanners: []string{spec.ID}, Findings: findings,
+			Blocking: len(blocking), Warnings: len(warnings), Excepted: excepted,
+		})
+		f.Close()
+		fmt.Fprintf(os.Stderr, "markdown-отчёт: %s\n", report)
 	}
 	fmt.Fprintf(os.Stderr, "итог DAST: %d находок, %d блокирующих, %d исключений, отчёт: %s\n", len(findings), len(blocking), excepted, path)
 	if len(blocking) > 0 {
