@@ -21,3 +21,6 @@ trivy.sarif
 
 # DAST artifacts
 dast/out/
+
+# SGATE analyzer cache
+.sgate-cache/
