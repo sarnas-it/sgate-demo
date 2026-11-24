@@ -126,6 +126,19 @@ go run ./cmd/sgatedast scan ... -policy ../dast/policy.yaml
 `block: [critical, high]`, `warn: [medium]`, `ignore: [low, info]`.
 Исключение требует `owner` и `expires`; просроченное не действует.
 
+## Сводный отчёт
+
+```bash
+rm -f dast/out/findings.jsonl
+go run ./cmd/sgatedast passive ... -findings-out dast/out/findings.jsonl
+go run ./cmd/sgatedast scan ... -id zap-full -findings-out dast/out/findings.jsonl
+go run ./cmd/sgatedast scan ... -id feroxbuster -findings-out dast/out/findings.jsonl
+go run ./cmd/sgatedast report -findings dast/out/findings.jsonl \
+  -out dast/out -target http://127.0.0.1:18081 -policy dast/policy.yaml
+```
+
+Один `report.md` и `report.sarif` по всем сканерам.
+
 ## SARIF
 
 `sgatedast scan|passive -sarif-out out.sarif` — единый SARIF для GitHub Security.
