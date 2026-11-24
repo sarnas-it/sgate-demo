@@ -55,7 +55,7 @@ func TestCatalogConsistency(t *testing.T) {
 			t.Errorf("%s: docker output must be under /out: %s", a.ID, a.Output)
 		}
 		switch a.Format {
-		case "sarif", "bandit-json":
+		case "sarif", "bandit-json", "phpstan-json":
 		default:
 			t.Errorf("%s: unexpected format %q", a.ID, a.Format)
 		}

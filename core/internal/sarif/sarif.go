@@ -91,6 +91,8 @@ func ParseFile(file, analyzerID, format string) ([]Finding, error) {
 		return Parse(file, analyzerID)
 	case "bandit-json":
 		return ParseBanditJSON(file, analyzerID)
+	case "phpstan-json":
+		return ParsePHPStanJSON(file, analyzerID)
 	default:
 		return nil, fmt.Errorf("unsupported format %q", format)
 	}
