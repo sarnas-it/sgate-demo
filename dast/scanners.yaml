@@ -12,10 +12,6 @@ scanners:
       - "{{target}}"
       - -J
       - report.json
-      - -r
-      - report.html
-      - -w
-      - report.md
       - -I
     output: /zap/wrk/report.json
     format: zap-json
@@ -35,10 +31,6 @@ scanners:
       - "{{target}}"
       - -J
       - report.json
-      - -r
-      - report.html
-      - -w
-      - report.md
       - -I
       - -j
       - -m
