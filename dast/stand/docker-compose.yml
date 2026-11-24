@@ -13,4 +13,6 @@ services:
 
 networks:
   dast:
-    internal: true
+    # Отдельная сеть; порт опубликован только на 127.0.0.1.
+    # internal: true не публикует порт на loopback, поэтому оставляем false.
+    internal: false
