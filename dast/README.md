@@ -45,6 +45,20 @@ go run ./cmd/sgatedast --scope ../dast/scope.example.yaml --out ../dast/out/urls
 фильтрует по scope. Для SPA вида Juice Shop HTML даёт только ассеты — реальные
 маршруты добавляются из OpenAPI/списка или crawl с браузером (B3+).
 
+## Запуск ZAP baseline
+
+```bash
+./dast/stand-up.sh
+cd core
+go run ./cmd/sgatedast scan \
+  -scope ../dast/scope.example.yaml \
+  -scanners ../dast/scanners.yaml \
+  -id zap-baseline -out ../dast/out -confirm
+```
+
+Проверено на Juice Shop: 38 находок ZAP, 0 блокирующих (baseline даёт
+предупреждения). Для активных high/critical нужен full scan и auth — B4/B5.
+
 ## Артефакты
 
 - `report.json`, `report.md`, `report.html` — в `dast/out/`;
