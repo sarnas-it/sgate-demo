@@ -80,6 +80,11 @@ Baseline матчится по fingerprint анализатора; если ег
 SGATE_INTEGRATION=1 go test ./internal/analyzer -run 'Test(Bandit|Gosec|Psalm)Adapter' -v
 ```
 
+## On-prem
+
+Правила offline/on-prem: `docs/adr/0005-offline-onprem.md`. Образы по digest,
+`--network none`, локальный кэш, без внешних LLM.
+
 ## Дальше по бэклогу
 
 M2: `phpstan`/`psalm`, Bandit, ESLint; каталог версий; baseline;
