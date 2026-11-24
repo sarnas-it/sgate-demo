@@ -111,7 +111,7 @@ func Load(path string) (*Config, error) {
 			a.ExitCodes = []int{0, 1}
 		}
 		switch a.Format {
-		case "sarif", "bandit-json":
+		case "sarif", "bandit-json", "phpstan-json":
 		default:
 			return nil, fmt.Errorf("%s: unsupported format %q", a.ID, a.Format)
 		}

@@ -64,6 +64,25 @@ analyzers:
     network: none
     timeout: 10m
 
+  # PHPStan: статические замечания, JSON в stdout.
+  - id: phpstan
+    languages: [php]
+    requires: [phpstan.neon]
+    runtime: docker
+    image: ghcr.io/phpstan/phpstan@sha256:a37607d838fa6e25d1debdd0f774021c2be91248e74126c32283c3d6d2ed1a0b
+    workdir: /src
+    command:
+      - analyse
+      - --error-format=json
+      - --no-progress
+      - --configuration=phpstan.neon
+    output: /out/phpstan.json
+    capture_stdout: true
+    format: phpstan-json
+    exit_codes: [0, 1]
+    network: none
+    timeout: 10m
+
   # PHP-адаптер: Psalm умеет SARIF, но возвращает 2 при находках.
   - id: psalm
     languages: [php]

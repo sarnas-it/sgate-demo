@@ -12,7 +12,7 @@ go run ./cmd/sgate --repo .. --config analyzers.yaml --list
 go run ./cmd/sgate --repo .. --config analyzers.yaml --format text
 ```
 
-Сейчас в конфиге Semgrep (все языки), gosec (Go, если есть `go.mod`), Bandit (Python, JSON) и Psalm (PHP, SARIF + taint). Образы закреплены по `@sha256`; каталог — `analyzers.lock`, проверка — `scripts/check-pins.sh`.
+Сейчас в конфиге Semgrep (все языки), gosec (Go, если есть `go.mod`), Bandit (Python, JSON), Psalm (PHP, SARIF + taint) и PHPStan (PHP, JSON). ESLint не добавлен: ему нужны `node_modules`; security JS/TS покрывает Semgrep. Образы закреплены по `@sha256`; каталог — `analyzers.lock`, проверка — `scripts/check-pins.sh`.
 Новый язык — запись в `analyzers.yaml`, код не меняется.
 
 ## Контракт анализатора
