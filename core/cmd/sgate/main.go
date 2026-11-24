@@ -3,10 +3,13 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -31,9 +34,13 @@ func main() {
 	verbose := flag.Bool("v", false, "печатать выбранные анализаторы")
 	baselinePath := flag.String("baseline", "", "файл принятых находок")
 	writeBaseline := flag.String("write-baseline", "", "записать текущие находки как принятые")
+	baseRef := flag.String("base", "", "базовая ревизия для diff-only")
+	headRef := flag.String("head", "HEAD", "ревизия для diff-only")
+	cacheDir := flag.String("cache-dir", ".sgate-cache", "каталог кэша анализаторов")
+	noCache := flag.Bool("no-cache", false, "не использовать кэш")
 	flag.Parse()
 
-	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose, *baselinePath, *writeBaseline)
+	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose, *baselinePath, *writeBaseline, *baseRef, *headRef, *cacheDir, *noCache)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sgate:", err)
 		if code == 0 {
@@ -76,6 +83,56 @@ func isExcluded(file string, patterns []string) bool {
 	return false
 }
 
+func repoCommit(repo string) (string, bool) {
+	out, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", false
+	}
+	status, err := exec.Command("git", "-C", repo, "status", "--porcelain").Output()
+	if err != nil || len(strings.TrimSpace(string(status))) > 0 {
+		return "", false
+	}
+	return strings.TrimSpace(string(out)), true
+}
+
+func cacheKey(spec config.Analyzer, commit string) string {
+	raw, _ := json.Marshal(spec)
+	sum := sha1.Sum(append(raw, []byte(commit)...))
+	return hex.EncodeToString(sum[:])
+}
+
+func changedFiles(repo, base, head string) (map[string]bool, error) {
+	out, err := exec.Command("git", "-C", repo, "diff", "--name-only", base+"..."+head).Output()
+	if err != nil {
+		return nil, err
+	}
+	files := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			files[filepath.ToSlash(line)] = true
+		}
+	}
+	return files, nil
+}
+
+func filterChanged(findings []sarif.Finding, files map[string]bool) []sarif.Finding {
+	out := findings[:0]
+	for _, f := range findings {
+		if files[filepath.ToSlash(f.File)] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func copyFile(src, dst string) error {
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, b, 0o644)
+}
+
 func countBaseline(findings []sarif.Finding) int {
 	n := 0
 	for _, f := range findings {
@@ -95,7 +152,7 @@ func requiresPresent(repo string, requires []string) bool {
 	return true
 }
 
-func run(repo, cfgPath, format, block string, list, keep, verbose bool, baselinePath, writeBaseline string) (int, error) {
+func run(repo, cfgPath, format, block string, list, keep, verbose bool, baselinePath, writeBaseline, baseRef, headRef, cacheDir string, noCache bool) (int, error) {
 	repoAbs, err := filepath.Abs(repo)
 	if err != nil {
 		return 2, err
@@ -146,6 +203,10 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 
 	user := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
 	configDir := filepath.Dir(cfgAbs)
+	commit, clean := repoCommit(repoAbs)
+	if noCache {
+		cacheDir = ""
+	}
 	type runResult struct {
 		id       string
 		findings []sarif.Finding
@@ -157,6 +218,18 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 		wg.Add(1)
 		go func(spec config.Analyzer) {
 			defer wg.Done()
+			key := ""
+			if cacheDir != "" && clean {
+				key = cacheKey(spec, commit)
+				cached := filepath.Join(cacheDir, key+".out")
+				if _, err := os.Stat(cached); err == nil {
+					got, err := sarif.ParseFile(cached, spec.ID, spec.Format)
+					if err == nil {
+						results <- runResult{id: spec.ID, findings: got}
+						return
+					}
+				}
+			}
 			outDir, err := os.MkdirTemp("", "sgate-out-")
 			if err != nil {
 				results <- runResult{id: spec.ID, err: err}
@@ -169,6 +242,10 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 			if err != nil {
 				results <- runResult{id: spec.ID, err: err}
 				return
+			}
+			if key != "" {
+				_ = os.MkdirAll(cacheDir, 0o755)
+				_ = copyFile(path, filepath.Join(cacheDir, key+".out"))
 			}
 			got, err := sarif.ParseFile(path, spec.ID, spec.Format)
 			if err != nil {
@@ -196,6 +273,13 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 	}
 
 	findings = filterExcluded(findings, cfg.Exclude)
+	if baseRef != "" {
+		if files, err := changedFiles(repoAbs, baseRef, headRef); err == nil {
+			findings = filterChanged(findings, files)
+		} else if verbose {
+			fmt.Fprintf(os.Stderr, "sgate: diff-only пропущен: %v\n", err)
+		}
+	}
 	if baselinePath != "" {
 		b, err := baseline.Load(baselinePath)
 		if err != nil {
