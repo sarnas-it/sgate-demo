@@ -94,6 +94,17 @@ go run ./cmd/sgatedast scan \
 Проверено на Juice Shop: 38 находок ZAP, 0 блокирующих (baseline даёт
 предупреждения). Для активных high/critical нужен full scan и auth — B5.
 
+ZAP full с auth (тестовая учётка):
+
+```bash
+DAST_TOKEN=... go run ./cmd/sgatedast scan \
+  -scope ../dast/scope.example.yaml \
+  -scanners ../dast/scanners.yaml -id zap-full -out ../dast/out -confirm
+```
+
+`zap-full` подставляет `Authorization: Bearer` через replacer; только тестовые
+учётки.
+
 Nuclei и feroxbuster:
 
 ```bash

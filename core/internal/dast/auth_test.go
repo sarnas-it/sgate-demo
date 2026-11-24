@@ -31,12 +31,20 @@ func TestAuthHeaderMissingEnv(t *testing.T) {
 }
 
 func TestScanArgsDropsEmptyAuth(t *testing.T) {
-	got := scanArgs([]string{"-u", "{{target}}", "-H", "{{auth_header}}"}, "http://x", "")
+	got := scanArgs([]string{"-u", "{{target}}", "-H", "{{auth_header}}"}, "http://x", "", "")
 	if len(got) != 2 || got[1] != "http://x" {
 		t.Fatalf("got %v", got)
 	}
-	got = scanArgs([]string{"-u", "{{target}}", "-H", "{{auth_header}}"}, "http://x", "Authorization: Bearer s")
+	got = scanArgs([]string{"-u", "{{target}}", "-H", "{{auth_header}}"}, "http://x", "Authorization: Bearer s", "s")
 	if len(got) != 4 || got[3] != "Authorization: Bearer s" {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestAuthValue(t *testing.T) {
+	t.Setenv("DAST_TOKEN", "secret")
+	v, err := (&Scope{Auth: &Auth{Mode: "bearer", TokenEnv: "DAST_TOKEN"}}).AuthValue()
+	if err != nil || v != "secret" {
+		t.Fatalf("got %q err %v", v, err)
 	}
 }

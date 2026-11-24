@@ -3,6 +3,7 @@
   "policy": "production uses image@sha256 only; tags are forbidden",
   "scanners": [
     {"id":"zap-baseline","image":"zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af","license":"Apache-2.0","source":"https://github.com/zaproxy/zaproxy"},
+    {"id":"zap-full","image":"zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af","license":"Apache-2.0","source":"https://github.com/zaproxy/zaproxy"},
     {"id":"nuclei","image":"projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb","license":"MIT","source":"https://github.com/projectdiscovery/nuclei"},
     {"id":"feroxbuster","image":"epi052/feroxbuster@sha256:ed41806cb9c45bdc01cc8767b68fd47027025570eac8dc2605a024a43a97a873","license":"MIT","source":"https://github.com/epi052/feroxbuster"}
   ]
