@@ -1,0 +1,16 @@
+name: sgate-dast
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v20.4.0
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - dast
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  dast:
+    internal: true
