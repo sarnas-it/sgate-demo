@@ -90,6 +90,15 @@ go run ./cmd/sgatedast scan -scope ../dast/scope.example.yaml \
 
 На Juice Shop: feroxbuster нашёл 5 путей (info), nuclei high/critical — 0.
 
+## Политика
+
+```bash
+go run ./cmd/sgatedast scan ... -policy ../dast/policy.yaml
+```
+
+`block: [critical, high]`, `warn: [medium]`, `ignore: [low, info]`.
+Исключение требует `owner` и `expires`; просроченное не действует.
+
 ## Дедуп
 
 Точные повторы (один fingerprint или `analyzer + rule + file + message`)

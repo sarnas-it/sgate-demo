@@ -75,7 +75,8 @@ func runScan(args []string) {
 	scannersPath := fs.String("scanners", "dast/scanners.yaml", "путь к scanners.yaml")
 	id := fs.String("id", "zap-baseline", "id сканера")
 	outDir := fs.String("out", "dast/out", "каталог отчётов")
-	block := fs.String("block", "high", "порог блокировки")
+	block := fs.String("block", "high", "порог блокировки, если нет policy")
+	policyPath := fs.String("policy", "", "путь к dast/policy.yaml")
 	confirm := fs.Bool("confirm", false, "подтвердить согласованный стенд")
 	fs.Parse(args)
 
@@ -130,6 +131,13 @@ func runScan(args []string) {
 		fail(err)
 	}
 	findings = dast.Dedup(findings)
+	var dastPolicy *dast.Policy
+	if *policyPath != "" {
+		dastPolicy, err = dast.LoadPolicy(*policyPath)
+		if err != nil {
+			fail(err)
+		}
+	}
 	// В отчёт попадают только URL внутри scope.
 	filtered := findings[:0]
 	for _, f := range findings {
@@ -141,18 +149,33 @@ func runScan(args []string) {
 	sort.SliceStable(findings, func(i, j int) bool {
 		return policy.Rank(findings[i].Severity) > policy.Rank(findings[j].Severity)
 	})
-	blocking := policy.Blocking(findings, *block)
+	var blocking []sarif.Finding
+	excepted := 0
+	if dastPolicy != nil {
+		blocking, _, excepted = dastPolicy.Evaluate(findings)
+	} else {
+		blocking = policy.Blocking(findings, *block)
+	}
 	for _, f := range findings {
 		mark := "warn "
-		if policy.Rank(f.Severity) >= policy.Rank(*block) {
+		if dastPolicy != nil {
+			if dastPolicyBlocking(dastPolicy, f) {
+				mark = "BLOCK"
+			}
+		} else if policy.Rank(f.Severity) >= policy.Rank(*block) {
 			mark = "BLOCK"
 		}
 		fmt.Printf("[%s] %s %s %s — %s\n", mark, f.File, f.Severity, f.RuleID, f.Message)
 	}
-	fmt.Fprintf(os.Stderr, "итог DAST: %d находок, %d блокирующих, отчёт: %s\n", len(findings), len(blocking), path)
+	fmt.Fprintf(os.Stderr, "итог DAST: %d находок, %d блокирующих, %d исключений, отчёт: %s\n", len(findings), len(blocking), excepted, path)
 	if len(blocking) > 0 {
 		os.Exit(1)
 	}
+}
+
+func dastPolicyBlocking(p *dast.Policy, f sarif.Finding) bool {
+	blocking, _, _ := p.Evaluate([]sarif.Finding{f})
+	return len(blocking) > 0
 }
 
 func fail(err error) {
