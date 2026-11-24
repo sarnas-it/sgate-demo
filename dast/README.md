@@ -115,6 +115,10 @@ go run ./cmd/sgatedast scan ... -policy ../dast/policy.yaml
 `block: [critical, high]`, `warn: [medium]`, `ignore: [low, info]`.
 Исключение требует `owner` и `expires`; просроченное не действует.
 
+## SARIF
+
+`sgatedast scan|passive -sarif-out out.sarif` — единый SARIF для GitHub Security.
+
 ## Отчёт и WSTG
 
 Каждый `scan` пишет `dast/out/report.md`: сводка по severity, таблица находок,

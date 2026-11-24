@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"code.sarnas.ru/sgate/internal/analyzer"
 	"code.sarnas.ru/sgate/internal/baseline"
@@ -145,29 +146,50 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 
 	user := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
 	configDir := filepath.Dir(cfgAbs)
+	type runResult struct {
+		id       string
+		findings []sarif.Finding
+		err      error
+	}
+	results := make(chan runResult, len(selected))
+	var wg sync.WaitGroup
+	for _, spec := range selected {
+		wg.Add(1)
+		go func(spec config.Analyzer) {
+			defer wg.Done()
+			outDir, err := os.MkdirTemp("", "sgate-out-")
+			if err != nil {
+				results <- runResult{id: spec.ID, err: err}
+				return
+			}
+			if !keep {
+				defer os.RemoveAll(outDir)
+			}
+			path, err := analyzer.Run(context.Background(), spec, repoAbs, configDir, outDir, user)
+			if err != nil {
+				results <- runResult{id: spec.ID, err: err}
+				return
+			}
+			got, err := sarif.ParseFile(path, spec.ID, spec.Format)
+			if err != nil {
+				results <- runResult{id: spec.ID, err: fmt.Errorf("%s: %w", spec.ID, err)}
+				return
+			}
+			results <- runResult{id: spec.ID, findings: got}
+		}(spec)
+	}
+	wg.Wait()
+	close(results)
+
 	var findings []sarif.Finding
 	var failed []string
-	for _, spec := range selected {
-		outDir, err := os.MkdirTemp("", "sgate-out-")
-		if err != nil {
-			return 2, err
-		}
-		if !keep {
-			defer os.RemoveAll(outDir)
-		}
-		path, err := analyzer.Run(context.Background(), spec, repoAbs, configDir, outDir, user)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "sgate: %v\n", err)
-			failed = append(failed, spec.ID)
+	for r := range results {
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "sgate: %v\n", r.err)
+			failed = append(failed, r.id)
 			continue
 		}
-		got, err := sarif.ParseFile(path, spec.ID, spec.Format)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "sgate: %s: %v\n", spec.ID, err)
-			failed = append(failed, spec.ID)
-			continue
-		}
-		findings = append(findings, got...)
+		findings = append(findings, r.findings...)
 	}
 	if len(failed) == len(selected) {
 		return 2, fmt.Errorf("все анализаторы завершились ошибкой: %s", strings.Join(failed, ", "))
