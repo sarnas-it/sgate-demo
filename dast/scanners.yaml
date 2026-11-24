@@ -1,7 +1,7 @@
 # Контракт DAST-сканера: SGATE запускает контейнер и читает отчёт.
 scanners:
   - id: zap-baseline
-    image: zaproxy/zap-stable:latest
+    image: zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
     workdir: /zap/wrk
     command:
       - zap-baseline.py
@@ -21,7 +21,7 @@ scanners:
     exit_codes: [0, 1, 2]
 
   - id: nuclei
-    image: projectdiscovery/nuclei:v3.11.1
+    image: projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb
     workdir: /out
     env:
       HOME: /tmp
@@ -45,7 +45,7 @@ scanners:
     exit_codes: [0, 1, 2]
 
   - id: feroxbuster
-    image: epi052/feroxbuster:2.13.0
+    image: epi052/feroxbuster@sha256:ed41806cb9c45bdc01cc8767b68fd47027025570eac8dc2605a024a43a97a873
     workdir: /out
     command:
       - -u

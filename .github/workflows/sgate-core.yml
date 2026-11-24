@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - "core/**"
+      - "dast/**"
       - "docs/adr/**"
+      - "scripts/check-pins.sh"
   push:
     branches: [main]
     paths:
       - "core/**"
+      - "dast/**"
       - "docs/adr/**"
+      - "scripts/check-pins.sh"
 
 jobs:
   test:
@@ -20,6 +24,8 @@ jobs:
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
+      - name: Check pinned images
+        run: ./scripts/check-pins.sh
       - name: Test and vet
         run: |
           cd core
