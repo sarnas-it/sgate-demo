@@ -106,8 +106,12 @@ func runScan(args []string) {
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
 		fail(err)
 	}
+	authHeader, err := scope.AuthHeader()
+	if err != nil {
+		fail(err)
+	}
 	user := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
-	path, err := spec.Run(context.Background(), scope.Target, filepath.Dir(*scannersPath), *outDir, user)
+	path, err := spec.Run(context.Background(), scope.Target, filepath.Dir(*scannersPath), *outDir, user, authHeader)
 	if err != nil {
 		fail(err)
 	}

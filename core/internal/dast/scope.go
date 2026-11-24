@@ -16,6 +16,49 @@ type Scope struct {
 	AllowedHosts []string `yaml:"allowed_hosts"`
 	MaxRPS       int      `yaml:"max_rps"`
 	Exclusions   []string `yaml:"exclusions"`
+	Auth         *Auth    `yaml:"auth"`
+}
+
+// Auth хранит только имена env-переменных, не сами секреты.
+type Auth struct {
+	Mode             string `yaml:"mode"` // none | bearer | header | cookie
+	Header           string `yaml:"header"`
+	TokenEnv         string `yaml:"token_env"`
+	CookieEnv        string `yaml:"cookie_env"`
+	TestAccountsOnly bool   `yaml:"test_accounts_only"`
+}
+
+// AuthHeader собирает заголовок из env. Секрет не попадает в ошибки.
+func (s *Scope) AuthHeader() (string, error) {
+	if s.Auth == nil || s.Auth.Mode == "" || s.Auth.Mode == "none" {
+		return "", nil
+	}
+	switch s.Auth.Mode {
+	case "bearer":
+		token := os.Getenv(s.Auth.TokenEnv)
+		if s.Auth.TokenEnv == "" || token == "" {
+			return "", fmt.Errorf("auth: env %s is empty", s.Auth.TokenEnv)
+		}
+		return "Authorization: Bearer " + token, nil
+	case "header":
+		header := s.Auth.Header
+		if header == "" {
+			header = "Authorization"
+		}
+		token := os.Getenv(s.Auth.TokenEnv)
+		if s.Auth.TokenEnv == "" || token == "" {
+			return "", fmt.Errorf("auth: env %s is empty", s.Auth.TokenEnv)
+		}
+		return header + ": " + token, nil
+	case "cookie":
+		value := os.Getenv(s.Auth.CookieEnv)
+		if s.Auth.CookieEnv == "" || value == "" {
+			return "", fmt.Errorf("auth: env %s is empty", s.Auth.CookieEnv)
+		}
+		return "Cookie: " + value, nil
+	default:
+		return "", fmt.Errorf("auth: unsupported mode %q", s.Auth.Mode)
+	}
 }
 
 // Load читает scope и проверяет, что target — http(s) URL.

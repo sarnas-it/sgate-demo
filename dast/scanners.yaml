@@ -36,6 +36,8 @@ scanners:
       - high,critical
       - -silent
       - -no-color
+      - -H
+      - "{{auth_header}}"
     output: /out/nuclei.jsonl
     format: nuclei-jsonl
     network: host
@@ -53,6 +55,8 @@ scanners:
       - /out/ferox.json
       - -w
       - /wordlists/common.txt
+      - -H
+      - "{{auth_header}}"
       - --no-state
       - -q
     mounts:

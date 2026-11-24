@@ -34,6 +34,25 @@
 - при ошибках 5xx или деградации стенда — остановить прогон;
 - kill switch: `Ctrl+C` или `docker compose down`; ZAP запускается отдельным контейнером.
 
+## Auth
+
+Секреты не хранятся в scope — только имя env-переменной:
+
+```yaml
+auth:
+  mode: bearer          # none | bearer | header | cookie
+  token_env: DAST_TOKEN
+  test_accounts_only: true
+```
+
+```bash
+DAST_TOKEN=... go run ./cmd/sgatedast scan ... -id nuclei
+```
+
+`bearer` → `Authorization: Bearer …`, `header` → указанный заголовок,
+`cookie` → `Cookie: …`. Если auth нет, `-H` из команды сканера убирается.
+Только тестовые учётки, только стенд. Матрица ролей — `dast/auth.md`.
+
 ## Discovery целей
 
 ```bash
