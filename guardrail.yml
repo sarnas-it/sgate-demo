@@ -13,6 +13,7 @@ ignore:
   paths:
     - "testdata/**"
     - "docs/**"
+    - "dast/**"
   matches:
     - rule: phone_ru
       path: "scripts/**"
