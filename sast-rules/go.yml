@@ -48,7 +48,18 @@ rules:
       - pattern: $R.FormValue(...)
       - pattern: $R.PathValue(...)
     pattern-sinks:
-      - pattern: $SLICE[$IDX]
+      - patterns:
+          # Только срез: map[$key] с ключом из запроса — не выход за границы.
+          - pattern: "($SLICE: []$T)[$IDX]"
+          # Помеченным должен быть именно индекс, иначе правило ловит контейнер.
+          - focus-metavariable: $IDX
+    pattern-propagators:
+      - pattern: $OUT, $ERR := strconv.Atoi($IN)
+        from: $IN
+        to: $OUT
     pattern-sanitizers:
+      # Индекс из range по тому же срезу не может выйти за его границы.
+      - pattern: for $IDX, $V := range $SLICE { ... }
+      - pattern: for $IDX := range $SLICE { ... }
       - pattern: if $IDX < len($SLICE) { ... }
       - pattern: if $IDX >= 0 && $IDX < len($SLICE) { ... }
