@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   dast:
@@ -54,12 +53,12 @@ jobs:
             -findings ../dast/out/findings.jsonl -out ../dast/out \
             -target http://127.0.0.1:3000 -policy ../dast/policy.yaml
 
-      - name: Upload SARIF
+      - name: Upload DAST SARIF artifact
         if: always() && hashFiles('dast/out/report.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: dast/out/report.sarif
-          category: dast
+          name: dast-sarif
+          path: dast/out/report.sarif
 
       - name: Stop stand
         if: always()
