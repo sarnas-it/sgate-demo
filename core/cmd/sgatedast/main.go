@@ -76,6 +76,7 @@ func runPassive(args []string) {
 	fs := flag.NewFlagSet("passive", flag.ExitOnError)
 	scopePath := fs.String("scope", "dast/scope.example.yaml", "путь к scope")
 	out := fs.String("out", "dast/out/passive.json", "JSON-отчёт")
+	sarifOut := fs.String("sarif-out", "", "SARIF-отчёт")
 	block := fs.String("block", "high", "порог блокировки")
 	fs.Parse(args)
 
@@ -104,6 +105,12 @@ func runPassive(args []string) {
 	if err := os.WriteFile(*out, append(b, '\n'), 0o644); err != nil {
 		fail(err)
 	}
+	if *sarifOut != "" {
+		if err := writeSARIF(*sarifOut, findings); err != nil {
+			fail(err)
+		}
+		fmt.Fprintf(os.Stderr, "SARIF: %s\n", *sarifOut)
+	}
 	fmt.Fprintf(os.Stderr, "итог passive: %d находок, %d блокирующих, отчёт: %s\n", len(findings), len(blocking), *out)
 	if len(blocking) > 0 {
 		os.Exit(1)
@@ -120,6 +127,7 @@ func runScan(args []string) {
 	policyPath := fs.String("policy", "", "путь к dast/policy.yaml")
 	confirm := fs.Bool("confirm", false, "подтвердить согласованный стенд")
 	reportPath := fs.String("report", "", "путь к markdown-отчёту (по умолчанию out/report.md)")
+	sarifOut := fs.String("sarif-out", "", "SARIF-отчёт")
 	fs.Parse(args)
 
 	if !*confirm && os.Getenv("DAST_CONFIRM") != "1" {
@@ -226,6 +234,12 @@ func runScan(args []string) {
 		f.Close()
 		fmt.Fprintf(os.Stderr, "markdown-отчёт: %s\n", report)
 	}
+	if *sarifOut != "" {
+		if err := writeSARIF(*sarifOut, findings); err != nil {
+			fail(err)
+		}
+		fmt.Fprintf(os.Stderr, "SARIF: %s\n", *sarifOut)
+	}
 	fmt.Fprintf(os.Stderr, "итог DAST: %d находок, %d блокирующих, %d исключений, отчёт: %s\n", len(findings), len(blocking), excepted, path)
 	if len(blocking) > 0 {
 		os.Exit(1)
@@ -235,6 +249,18 @@ func runScan(args []string) {
 func dastPolicyBlocking(p *dast.Policy, f sarif.Finding) bool {
 	blocking, _, _ := p.Evaluate([]sarif.Finding{f})
 	return len(blocking) > 0
+}
+
+func writeSARIF(path string, findings []sarif.Finding) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return sarif.Write(f, findings, "SGATE-DAST")
 }
 
 func fail(err error) {
