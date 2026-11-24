@@ -1,0 +1,12 @@
+# Политика DAST: что останавливает релиз, что предупреждает.
+block: [critical, high]
+warn: [medium]
+ignore: [low, info]
+
+# Исключение без владельца и срока невалидно.
+exceptions: []
+#  - rule: "10021"
+#    path: /health
+#    owner: "ИБ"
+#    expires: "2026-12-31"
+#    reason: "health endpoint, не пользовательский"
