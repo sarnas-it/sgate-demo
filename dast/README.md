@@ -106,9 +106,8 @@ go run ./cmd/sgatedast scan ... -policy ../dast/policy.yaml
 
 ## Дедуп
 
-Точные повторы (один fingerprint или `analyzer + rule + file + message`)
-убираются. Разные сканеры на один URL остаются раздельно — их склейка будет
-отдельным шагом B6.
+Точные повторы убираются. ZAP и nuclei на один URL с одним CWE склеиваются:
+`file + CWE`. Разные CWE или разные URL остаются раздельно.
 
 ## Артефакты
 

@@ -13,9 +13,11 @@ func TestDedup(t *testing.T) {
 		{Analyzer: "zap", RuleID: "10021", File: "http://x/a", Message: "m"},
 		{Analyzer: "zap", RuleID: "10021", File: "http://x/a", Message: "m"},
 		{Analyzer: "zap", RuleID: "10021", File: "http://x/b", Message: "m"},
+		{Analyzer: "zap", RuleID: "10038", File: "http://x/c", CWE: "CWE-79", Message: "csp"},
+		{Analyzer: "nuclei", RuleID: "csp-check", File: "http://x/c", CWE: "CWE-79", Message: "csp"},
 	}
 	got := Dedup(in)
-	if len(got) != 3 {
+	if len(got) != 4 {
 		t.Fatalf("got %d: %+v", len(got), got)
 	}
 }

@@ -8,7 +8,7 @@ import (
 
 func TestParseZAPJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "zap.json")
-	raw := `{"site":[{"@name":"http://127.0.0.1:3000","alerts":[{"pluginid":"10021","alert":"X-Content-Type-Options","riskcode":"2","desc":"missing header","instances":[{"uri":"http://127.0.0.1:3000/","method":"GET","param":""}]},{"pluginid":"10038","alert":"CSP","riskcode":"3","desc":"no CSP","instances":[]}]}]}`
+	raw := `{"site":[{"@name":"http://127.0.0.1:3000","alerts":[{"pluginid":"10021","alert":"X-Content-Type-Options","riskcode":"2","desc":"missing header","instances":[{"uri":"http://127.0.0.1:3000/","method":"GET","param":""}]},{"pluginid":"10038","alert":"CSP","riskcode":"3","cweid":"79","desc":"no CSP","instances":[]}]}]}`
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestParseZAPJSON(t *testing.T) {
 	if got[0].Severity != "medium" || got[0].File != "http://127.0.0.1:3000/" {
 		t.Errorf("first = %+v", got[0])
 	}
-	if got[1].Severity != "high" {
+	if got[1].Severity != "high" || got[1].CWE != "CWE-79" {
 		t.Errorf("second = %+v", got[1])
 	}
 }
