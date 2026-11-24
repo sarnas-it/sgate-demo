@@ -13,6 +13,7 @@ import (
 
 	"code.sarnas.ru/sgate/internal/dast"
 	"code.sarnas.ru/sgate/internal/policy"
+	"code.sarnas.ru/sgate/internal/sarif"
 )
 
 func main() {
@@ -106,11 +107,21 @@ func runScan(args []string) {
 		fail(err)
 	}
 	user := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
-	path, err := spec.Run(context.Background(), scope.Target, *outDir, user)
+	path, err := spec.Run(context.Background(), scope.Target, filepath.Dir(*scannersPath), *outDir, user)
 	if err != nil {
 		fail(err)
 	}
-	findings, err := dast.ParseZAPJSON(path, spec.ID)
+	var findings []sarif.Finding
+	switch spec.Format {
+	case "zap-json":
+		findings, err = dast.ParseZAPJSON(path, spec.ID)
+	case "nuclei-jsonl":
+		findings, err = dast.ParseNucleiJSONL(path, spec.ID)
+	case "ferox-json":
+		findings, err = dast.ParseFeroxJSON(path, spec.ID)
+	default:
+		err = fmt.Errorf("unsupported scanner format %q", spec.Format)
+	}
 	if err != nil {
 		fail(err)
 	}

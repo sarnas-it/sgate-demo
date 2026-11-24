@@ -14,17 +14,25 @@ import (
 
 // Scanner — сменный DAST-сканер. Как и SAST-адаптер, SGATE не знает его
 // внутренностей: запускает контейнер и читает отчёт.
+type Mount struct {
+	Source   string `yaml:"source"`
+	Target   string `yaml:"target"`
+	ReadOnly bool   `yaml:"read_only"`
+}
+
 type Scanner struct {
-	ID         string   `yaml:"id"`
-	Image      string   `yaml:"image"`
-	Entrypoint string   `yaml:"entrypoint"`
-	Workdir    string   `yaml:"workdir"`
-	Command    []string `yaml:"command"`
-	Output     string   `yaml:"output"`
-	Format     string   `yaml:"format"`
-	Network    string   `yaml:"network"`
-	Timeout    string   `yaml:"timeout"`
-	ExitCodes  []int    `yaml:"exit_codes"`
+	ID         string            `yaml:"id"`
+	Image      string            `yaml:"image"`
+	Entrypoint string            `yaml:"entrypoint"`
+	Workdir    string            `yaml:"workdir"`
+	Command    []string          `yaml:"command"`
+	Output     string            `yaml:"output"`
+	Format     string            `yaml:"format"`
+	Network    string            `yaml:"network"`
+	Timeout    string            `yaml:"timeout"`
+	ExitCodes  []int             `yaml:"exit_codes"`
+	Mounts     []Mount           `yaml:"mounts"`
+	Env        map[string]string `yaml:"env"`
 }
 
 type ScannerConfig struct {
@@ -76,7 +84,7 @@ func LoadScanners(path string) (*ScannerConfig, error) {
 }
 
 // Run выполняет сканер по target и возвращает путь к отчёту на хосте.
-func (s Scanner) Run(ctx context.Context, target, outDir, user string) (string, error) {
+func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user string) (string, error) {
 	timeout, err := time.ParseDuration(s.Timeout)
 	if err != nil {
 		return "", err
@@ -97,6 +105,24 @@ func (s Scanner) Run(ctx context.Context, target, outDir, user string) (string, 
 	}
 	if s.Entrypoint != "" {
 		args = append(args, "--entrypoint", s.Entrypoint)
+	}
+	for k, v := range s.Env {
+		args = append(args, "-e", k+"="+v)
+	}
+	for _, m := range s.Mounts {
+		src := m.Source
+		if !filepath.IsAbs(src) {
+			src = filepath.Join(configDir, src)
+		}
+		abs, err := filepath.Abs(src)
+		if err != nil {
+			return "", err
+		}
+		mount := abs + ":" + m.Target
+		if m.ReadOnly {
+			mount += ":ro"
+		}
+		args = append(args, "-v", mount)
 	}
 	args = append(args, s.Image)
 	for _, a := range s.Command {
