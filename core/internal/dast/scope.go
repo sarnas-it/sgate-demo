@@ -28,6 +28,29 @@ type Auth struct {
 	TestAccountsOnly bool   `yaml:"test_accounts_only"`
 }
 
+// AuthValue возвращает значение токена/cookie для подстановки в сканер.
+func (s *Scope) AuthValue() (string, error) {
+	if s.Auth == nil || s.Auth.Mode == "" || s.Auth.Mode == "none" {
+		return "", nil
+	}
+	switch s.Auth.Mode {
+	case "bearer", "header":
+		v := os.Getenv(s.Auth.TokenEnv)
+		if s.Auth.TokenEnv == "" || v == "" {
+			return "", fmt.Errorf("auth: env %s is empty", s.Auth.TokenEnv)
+		}
+		return v, nil
+	case "cookie":
+		v := os.Getenv(s.Auth.CookieEnv)
+		if s.Auth.CookieEnv == "" || v == "" {
+			return "", fmt.Errorf("auth: env %s is empty", s.Auth.CookieEnv)
+		}
+		return v, nil
+	default:
+		return "", fmt.Errorf("auth: unsupported mode %q", s.Auth.Mode)
+	}
+}
+
 // AuthHeader собирает заголовок из env. Секрет не попадает в ошибки.
 func (s *Scope) AuthHeader() (string, error) {
 	if s.Auth == nil || s.Auth.Mode == "" || s.Auth.Mode == "none" {

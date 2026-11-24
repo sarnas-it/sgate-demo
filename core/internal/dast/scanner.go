@@ -84,7 +84,7 @@ func LoadScanners(path string) (*ScannerConfig, error) {
 }
 
 // Run выполняет сканер по target и возвращает путь к отчёту на хосте.
-func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authHeader string) (string, error) {
+func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authHeader, authValue string) (string, error) {
 	timeout, err := time.ParseDuration(s.Timeout)
 	if err != nil {
 		return "", err
@@ -125,7 +125,7 @@ func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authH
 		args = append(args, "-v", mount)
 	}
 	args = append(args, s.Image)
-	args = append(args, scanArgs(s.Command, target, authHeader)...)
+	args = append(args, scanArgs(s.Command, target, authHeader, authValue)...)
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -143,7 +143,7 @@ func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authH
 }
 
 // scanArgs подставляет target и auth, убирая -H/--header, если авторизации нет.
-func scanArgs(command []string, target, authHeader string) []string {
+func scanArgs(command []string, target, authHeader, authValue string) []string {
 	out := make([]string, 0, len(command))
 	for _, a := range command {
 		if a == "{{auth_header}}" {
@@ -156,7 +156,10 @@ func scanArgs(command []string, target, authHeader string) []string {
 			out = append(out, authHeader)
 			continue
 		}
-		out = append(out, strings.ReplaceAll(a, "{{target}}", target))
+		a = strings.ReplaceAll(a, "{{target}}", target)
+		a = strings.ReplaceAll(a, "{{auth_header}}", authHeader)
+		a = strings.ReplaceAll(a, "{{auth_value}}", authValue)
+		out = append(out, a)
 	}
 	return out
 }

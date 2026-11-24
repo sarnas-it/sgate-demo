@@ -20,6 +20,31 @@ scanners:
     timeout: 10m
     exit_codes: [0, 1, 2]
 
+  - id: zap-full
+    image: zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+    workdir: /zap/wrk
+    command:
+      - zap-full-scan.py
+      - -t
+      - "{{target}}"
+      - -J
+      - report.json
+      - -r
+      - report.html
+      - -w
+      - report.md
+      - -I
+      - -j
+      - -m
+      - "2"
+      - -z
+      - "-config replacer.full_list(0).description=sgate -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization -config replacer.full_list(0).replacement=Bearer {{auth_value}}"
+    output: /zap/wrk/report.json
+    format: zap-json
+    network: host
+    timeout: 15m
+    exit_codes: [0, 1, 2]
+
   - id: nuclei
     image: projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb
     workdir: /out
