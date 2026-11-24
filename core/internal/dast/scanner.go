@@ -33,6 +33,9 @@ type Scanner struct {
 	ExitCodes  []int             `yaml:"exit_codes"`
 	Mounts     []Mount           `yaml:"mounts"`
 	Env        map[string]string `yaml:"env"`
+	// User переопределяет uid:gid контейнера. ZAP пишет в /tmp и /zap/wrk,
+	// поэтому для него нужен 0:0.
+	User string `yaml:"user"`
 }
 
 type ScannerConfig struct {
@@ -99,6 +102,9 @@ func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authH
 		"--pids-limit", "512",
 		"-v", outDir + ":" + s.Workdir,
 		"-w", s.Workdir,
+	}
+	if s.User != "" {
+		user = s.User
 	}
 	if user != "" {
 		args = append(args, "--user", user)
