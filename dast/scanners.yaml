@@ -69,6 +69,31 @@ scanners:
     timeout: 10m
     exit_codes: [0, 1, 2]
 
+  - id: feroxbuster-tt
+    image: epi052/feroxbuster@sha256:ed41806cb9c45bdc01cc8767b68fd47027025570eac8dc2605a024a43a97a873
+    workdir: /out
+    command:
+      - -u
+      - "{{target}}"
+      - --json
+      - -o
+      - /out/ferox-tt.json
+      - -w
+      - /wordlists/tasktracker.txt
+      - --no-state
+      - -q
+      - --filter-status
+      - "404"
+    mounts:
+      - source: wordlists
+        target: /wordlists
+        read_only: true
+    output: /out/ferox-tt.json
+    format: ferox-json
+    network: host
+    timeout: 10m
+    exit_codes: [0, 1, 2]
+
   - id: feroxbuster
     image: epi052/feroxbuster@sha256:ed41806cb9c45bdc01cc8767b68fd47027025570eac8dc2605a024a43a97a873
     workdir: /out

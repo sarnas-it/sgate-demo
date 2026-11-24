@@ -23,7 +23,7 @@ func TestParseNuclei(t *testing.T) {
 
 func TestParseFerox(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f.jsonl")
-	raw := `{"type":"response","url":"http://x/admin","status":200}` + "\n"
+	raw := `{"type":"response","url":"http://x/admin","status":200}` + "\n" + `{"type":"response","url":"http://x/missing","status":404}` + "\n"
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
