@@ -250,11 +250,16 @@ func Coverage() []CoverageRow {
 	var rows []CoverageRow
 	for _, t := range Catalog() {
 		row := CoverageRow{Type: t.Code, Name: t.Name, Required: t.Required}
+		var analyzers []string
 		for analyzer, rules := range byType[t.Code] {
 			sort.Strings(rules)
-			row.Analyzer = strings.TrimSpace(row.Analyzer + " " + analyzer)
+			analyzers = append(analyzers, analyzer)
 			row.Rules = append(row.Rules, rules...)
 		}
+		// Порядок анализаторов фиксирован: документ генерируется в CI и
+		// сравнивается с закоммиченным, случайный порядок ломал бы проверку.
+		sort.Strings(analyzers)
+		row.Analyzer = strings.Join(analyzers, " ")
 		sort.Strings(row.Rules)
 		rows = append(rows, row)
 	}

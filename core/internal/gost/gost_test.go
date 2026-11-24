@@ -71,3 +71,18 @@ func TestCatalogMarkdownHasCWEAandExample(t *testing.T) {
 		}
 	}
 }
+
+// TestCoverageIsDeterministic — порядок анализаторов фиксирован, иначе
+// документ 8.10 меняется от прогона к прогону и CI-проверка «не устарел»
+// падает случайно.
+func TestCoverageIsDeterministic(t *testing.T) {
+	first := Coverage()
+	for i := 0; i < 20; i++ {
+		again := Coverage()
+		for j := range first {
+			if first[j].Analyzer != again[j].Analyzer {
+				t.Fatalf("порядок анализаторов нестабилен: %q vs %q", first[j].Analyzer, again[j].Analyzer)
+			}
+		}
+	}
+}
