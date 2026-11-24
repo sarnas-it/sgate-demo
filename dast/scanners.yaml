@@ -3,6 +3,8 @@ scanners:
   - id: zap-baseline
     image: zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
     workdir: /zap/wrk
+    env:
+      HOME: /tmp
     command:
       - zap-baseline.py
       - -t
@@ -23,6 +25,8 @@ scanners:
   - id: zap-full
     image: zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
     workdir: /zap/wrk
+    env:
+      HOME: /tmp
     command:
       - zap-full-scan.py
       - -t
