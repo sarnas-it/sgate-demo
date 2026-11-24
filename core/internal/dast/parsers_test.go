@@ -8,7 +8,7 @@ import (
 
 func TestParseNuclei(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "n.jsonl")
-	raw := `{"template-id":"CVE-2024-1","info":{"name":"RCE","severity":"critical"},"host":"http://x","matched-at":"http://x/a","matcher-name":"rce"}` + "\n"
+	raw := `{"template-id":"CVE-2024-1","info":{"name":"RCE","severity":"critical","classification":{"cwe-id":["89"]}},"host":"http://x","matched-at":"http://x/a","matcher-name":"rce"}` + "\n"
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +16,7 @@ func TestParseNuclei(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got %v err %v", got, err)
 	}
-	if got[0].Severity != "critical" || got[0].RuleID != "CVE-2024-1" {
+	if got[0].Severity != "critical" || got[0].RuleID != "CVE-2024-1" || got[0].CWE != "CWE-89" {
 		t.Errorf("got %+v", got[0])
 	}
 }

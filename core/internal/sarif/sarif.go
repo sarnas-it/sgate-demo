@@ -19,6 +19,7 @@ type Finding struct {
 	Severity    string `json:"severity"`
 	Message     string `json:"message"`
 	File        string `json:"file"`
+	CWE         string `json:"cwe,omitempty"`
 	Line        int    `json:"line"`
 	Fingerprint string `json:"fingerprint"`
 	Baseline    bool   `json:"baseline,omitempty"`

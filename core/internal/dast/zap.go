@@ -20,6 +20,7 @@ type zapReport struct {
 			PluginID  string `json:"pluginid"`
 			Alert     string `json:"alert"`
 			RiskCode  string `json:"riskcode"`
+			CWEID     string `json:"cweid"`
 			Desc      string `json:"desc"`
 			Instances []struct {
 				URI    string `json:"uri"`
@@ -56,6 +57,7 @@ func ParseZAPJSON(path, analyzerID string) ([]sarif.Finding, error) {
 					Analyzer: analyzerID,
 					RuleID:   alert.PluginID,
 					Severity: severityFromZAP(alert.RiskCode),
+					CWE:      normalizeCWE(alert.CWEID),
 					Message:  cleanMessage(alert.Alert + ": " + alert.Desc),
 					File:     inst.URI,
 					Line:     1,

@@ -15,8 +15,9 @@ import (
 type nucleiResult struct {
 	TemplateID string `json:"template-id"`
 	Info       struct {
-		Name     string `json:"name"`
-		Severity string `json:"severity"`
+		Name           string         `json:"name"`
+		Severity       string         `json:"severity"`
+		Classification map[string]any `json:"classification"`
 	} `json:"info"`
 	Host        string `json:"host"`
 	MatchedAt   string `json:"matched-at"`
@@ -50,6 +51,7 @@ func ParseNucleiJSONL(path, analyzerID string) ([]sarif.Finding, error) {
 			Analyzer: analyzerID,
 			RuleID:   r.TemplateID,
 			Severity: severityFromNuclei(r.Info.Severity),
+			CWE:      normalizeCWE(r.Info.Classification["cwe-id"]),
 			Message:  cleanMessage(r.Info.Name + " " + r.MatcherName),
 			File:     loc,
 			Line:     1,
