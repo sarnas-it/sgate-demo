@@ -8,7 +8,10 @@ methods:
   allow: [GET, HEAD, OPTIONS]
   deny: [DELETE]
 auth:
-  mode: none          # none | form | token
+  mode: none          # none | bearer | header | cookie
+  # token_env: DAST_TOKEN
+  # header: Authorization
+  # cookie_env: DAST_COOKIE
   test_accounts_only: true
 exclusions:
   - /logout

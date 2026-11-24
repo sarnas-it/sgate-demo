@@ -84,7 +84,7 @@ func LoadScanners(path string) (*ScannerConfig, error) {
 }
 
 // Run выполняет сканер по target и возвращает путь к отчёту на хосте.
-func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user string) (string, error) {
+func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user, authHeader string) (string, error) {
 	timeout, err := time.ParseDuration(s.Timeout)
 	if err != nil {
 		return "", err
@@ -125,9 +125,7 @@ func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user string
 		args = append(args, "-v", mount)
 	}
 	args = append(args, s.Image)
-	for _, a := range s.Command {
-		args = append(args, strings.ReplaceAll(a, "{{target}}", target))
-	}
+	args = append(args, scanArgs(s.Command, target, authHeader)...)
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -142,6 +140,25 @@ func (s Scanner) Run(ctx context.Context, target, configDir, outDir, user string
 		return "", fmt.Errorf("%s: report not found at %s: %w", s.ID, hostOut, err)
 	}
 	return hostOut, nil
+}
+
+// scanArgs подставляет target и auth, убирая -H/--header, если авторизации нет.
+func scanArgs(command []string, target, authHeader string) []string {
+	out := make([]string, 0, len(command))
+	for _, a := range command {
+		if a == "{{auth_header}}" {
+			if authHeader == "" {
+				if n := len(out); n > 0 && (out[n-1] == "-H" || out[n-1] == "--header") {
+					out = out[:n-1]
+				}
+				continue
+			}
+			out = append(out, authHeader)
+			continue
+		}
+		out = append(out, strings.ReplaceAll(a, "{{target}}", target))
+	}
+	return out
 }
 
 func exitAllowed(codes []int, code int) bool {
