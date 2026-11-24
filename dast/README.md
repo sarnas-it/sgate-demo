@@ -53,6 +53,10 @@ DAST_TOKEN=... go run ./cmd/sgatedast scan ... -id nuclei
 `cookie` → `Cookie: …`. Если auth нет, `-H` из команды сканера убирается.
 Только тестовые учётки, только стенд. Матрица ролей — `dast/auth.md`.
 
+## Каталог сканеров
+
+Образы закреплены по digest; каталог — `dast/scanners.lock`, проверка — `scripts/check-pins.sh`.
+
 ## Passive WSTG
 
 ```bash
