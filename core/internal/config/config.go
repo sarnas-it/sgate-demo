@@ -19,22 +19,28 @@ type Mount struct {
 // Analyzer — сменный SAST-анализатор. SGATE не знает его внутренностей:
 // запускает команду/образ и читает SARIF.
 type Analyzer struct {
-	ID        string            `yaml:"id"`
-	Languages []string          `yaml:"languages"`
-	Runtime   string            `yaml:"runtime"` // docker | command
-	Image     string            `yaml:"image"`
-	Command   []string          `yaml:"command"`
-	Workdir   string            `yaml:"workdir"`
-	Mounts    []Mount           `yaml:"mounts"`
-	Output    string            `yaml:"output"`
-	Network   string            `yaml:"network"`
-	Timeout   string            `yaml:"timeout"`
-	Env       map[string]string `yaml:"env"`
+	ID         string            `yaml:"id"`
+	Languages  []string          `yaml:"languages"`
+	Runtime    string            `yaml:"runtime"` // docker | command
+	Image      string            `yaml:"image"`
+	Entrypoint string            `yaml:"entrypoint"`
+	Command    []string          `yaml:"command"`
+	Workdir    string            `yaml:"workdir"`
+	Mounts     []Mount           `yaml:"mounts"`
+	Output     string            `yaml:"output"`
+	Network    string            `yaml:"network"`
+	Timeout    string            `yaml:"timeout"`
+	Env        map[string]string `yaml:"env"`
 	// Requires — файлы/каталоги, без которых анализатор не имеет смысла
 	// (например, go.mod для gosec). Проверяются относительно корня репозитория.
 	Requires []string `yaml:"requires"`
 	// Format — формат вывода: sarif (по умолчанию) или bandit-json.
 	Format string `yaml:"format"`
+	// ExitCodes — коды, которые считаются «анализатор отработал» (находки —
+	// это не сбой). По умолчанию [0,1]; Psalm возвращает 2 при находках.
+	ExitCodes []int `yaml:"exit_codes"`
+	// CaptureStdout — записать stdout анализатора в output (Psalm, PHPStan).
+	CaptureStdout bool `yaml:"capture_stdout"`
 }
 
 // Config — корневой файл analyzers.yaml.
@@ -100,6 +106,9 @@ func Load(path string) (*Config, error) {
 		}
 		if a.Format == "" {
 			a.Format = "sarif"
+		}
+		if len(a.ExitCodes) == 0 {
+			a.ExitCodes = []int{0, 1}
 		}
 		switch a.Format {
 		case "sarif", "bandit-json":

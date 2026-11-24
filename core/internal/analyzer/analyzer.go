@@ -54,28 +54,45 @@ func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, use
 		return "", fmt.Errorf("%s: unsupported runtime %q", spec.ID, spec.Runtime)
 	}
 
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	if err != nil {
-		// Анализатор может вернуть 1, если находки есть (Semgrep --error).
-		// Это не сбой, если SARIF записан.
+		// Анализатор может вернуть 1/2, если находки есть (Semgrep, Psalm).
+		// Это не сбой, если отчёт записан в файл или захвачен stdout.
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
-			if _, statErr := os.Stat(hostOut); statErr == nil {
+		if errors.As(err, &exitErr) && exitAllowed(spec.ExitCodes, exitErr.ExitCode()) {
+			if _, statErr := os.Stat(hostOut); statErr == nil || (spec.CaptureStdout && stdout.Len() > 0) {
 				err = nil
 			}
 		}
 		if err != nil {
-			msg := strings.TrimSpace(string(out))
+			msg := strings.TrimSpace(stderr.String() + "\n" + stdout.String())
 			if len(msg) > 4000 {
 				msg = msg[len(msg)-4000:]
 			}
 			return "", fmt.Errorf("%s: %w: %s", spec.ID, err, msg)
 		}
 	}
+	if spec.CaptureStdout {
+		if err := os.WriteFile(hostOut, stdout.Bytes(), 0o644); err != nil {
+			return "", fmt.Errorf("%s: write stdout: %w", spec.ID, err)
+		}
+	}
 	if _, err := os.Stat(hostOut); err != nil {
 		return "", fmt.Errorf("%s: SARIF not found at %s: %w", spec.ID, hostOut, err)
 	}
 	return hostOut, nil
+}
+
+func exitAllowed(codes []int, code int) bool {
+	for _, c := range codes {
+		if c == code {
+			return true
+		}
+	}
+	return false
 }
 
 func hostOutput(spec config.Analyzer, repo, outDir string) string {
@@ -105,6 +122,9 @@ func dockerArgs(spec config.Analyzer, repo, configDir, outDir, user string) ([]s
 	}
 	if user != "" {
 		args = append(args, "--user", user)
+	}
+	if spec.Entrypoint != "" {
+		args = append(args, "--entrypoint", spec.Entrypoint)
 	}
 	for k, v := range spec.Env {
 		args = append(args, "-e", k+"="+v)
