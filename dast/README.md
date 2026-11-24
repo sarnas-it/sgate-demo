@@ -34,6 +34,17 @@
 - при ошибках 5xx или деградации стенда — остановить прогон;
 - kill switch: `Ctrl+C` или `docker compose down`; ZAP запускается отдельным контейнером.
 
+## Discovery целей
+
+```bash
+cd core
+go run ./cmd/sgatedast --scope ../dast/scope.example.yaml --out ../dast/out/urls.txt
+```
+
+Собирает ссылки с главной, `sitemap.xml`, `openapi.json`, `swagger.json` и
+фильтрует по scope. Для SPA вида Juice Shop HTML даёт только ассеты — реальные
+маршруты добавляются из OpenAPI/списка или crawl с браузером (B3+).
+
 ## Артефакты
 
 - `report.json`, `report.md`, `report.html` — в `dast/out/`;
