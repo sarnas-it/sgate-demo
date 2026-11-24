@@ -19,3 +19,48 @@ scanners:
     network: host
     timeout: 10m
     exit_codes: [0, 1, 2]
+
+  - id: nuclei
+    image: projectdiscovery/nuclei:v3.11.1
+    workdir: /out
+    env:
+      HOME: /tmp
+      XDG_CONFIG_HOME: /tmp/.config
+    command:
+      - -u
+      - "{{target}}"
+      - -jsonl
+      - -o
+      - /out/nuclei.jsonl
+      - -severity
+      - high,critical
+      - -silent
+      - -no-color
+    output: /out/nuclei.jsonl
+    format: nuclei-jsonl
+    network: host
+    timeout: 10m
+    exit_codes: [0, 1, 2]
+
+  - id: feroxbuster
+    image: epi052/feroxbuster:2.13.0
+    workdir: /out
+    command:
+      - -u
+      - "{{target}}"
+      - --json
+      - -o
+      - /out/ferox.json
+      - -w
+      - /wordlists/common.txt
+      - --no-state
+      - -q
+    mounts:
+      - source: wordlists
+        target: /wordlists
+        read_only: true
+    output: /out/ferox.json
+    format: ferox-json
+    network: host
+    timeout: 10m
+    exit_codes: [0, 1, 2]

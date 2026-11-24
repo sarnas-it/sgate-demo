@@ -57,7 +57,19 @@ go run ./cmd/sgatedast scan \
 ```
 
 Проверено на Juice Shop: 38 находок ZAP, 0 блокирующих (baseline даёт
-предупреждения). Для активных high/critical нужен full scan и auth — B4/B5.
+предупреждения). Для активных high/critical нужен full scan и auth — B5.
+
+Nuclei и feroxbuster:
+
+```bash
+go run ./cmd/sgatedast scan -scope ../dast/scope.example.yaml \
+  -scanners ../dast/scanners.yaml -id nuclei -out ../dast/out -confirm
+
+go run ./cmd/sgatedast scan -scope ../dast/scope.example.yaml \
+  -scanners ../dast/scanners.yaml -id feroxbuster -out ../dast/out -confirm
+```
+
+На Juice Shop: feroxbuster нашёл 5 путей (info), nuclei high/critical — 0.
 
 ## Артефакты
 
