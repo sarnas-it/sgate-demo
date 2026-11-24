@@ -23,7 +23,7 @@ import (
 func main() {
 	repo := flag.String("repo", ".", "путь к репозиторию")
 	cfgPath := flag.String("config", "analyzers.yaml", "путь к analyzers.yaml")
-	format := flag.String("format", "text", "text или json")
+	format := flag.String("format", "text", "text, json или sarif")
 	block := flag.String("block", "high", "порог блокировки: critical|high|medium|low")
 	list := flag.Bool("list", false, "показать анализаторы и выйти")
 	keep := flag.Bool("keep", false, "не удалять временные SARIF")
@@ -200,7 +200,13 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 	})
 	blocking := policy.Blocking(findings, block)
 
-	if format == "json" {
+	if format == "sarif" {
+		if err := sarif.Write(os.Stdout, findings, "SGATE"); err != nil {
+			return 2, err
+		}
+		fmt.Fprintf(os.Stderr, "итог: %d находок, %d baseline, %d блокирующих, анализаторов %d, ошибок %d\n",
+			len(findings), countBaseline(findings), len(blocking), len(selected)-len(failed), len(failed))
+	} else if format == "json" {
 		payload := map[string]any{
 			"findings": findings,
 			"summary": map[string]any{
