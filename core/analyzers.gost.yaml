@@ -45,4 +45,7 @@ analyzers:
       GOTOOLCHAIN: local
     output: /out/gosec.sarif
     network: none
+    # gosec при ошибке сборки печатает это и отдаёт пустой SARIF с кодом 0.
+    fail_on:
+      - "Golang errors in file"
     timeout: 10m

@@ -57,3 +57,36 @@ func TestLinkedGitRoot(t *testing.T) {
 		t.Fatal("normal dir must not be a linked worktree")
 	}
 }
+
+// TestFailOnMarksZeroExitAsFailure — анализатор может отдать пустой отчёт с
+// кодом 0, сообщив о сбое в выводе (gosec: «Golang errors in file»). Такой
+// прогон обязан считаться сбоем, иначе «0 находок» — ложное отрицание.
+func TestFailOnMarksZeroExitAsFailure(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:      "fake",
+		Runtime: "command",
+		Command: []string{"sh", "-c", `printf '{}' > "$SGATE_OUT"; echo "Golang errors in file: [plugins/standard]" >&2`},
+		Output:  "out.sarif",
+		Timeout: "10s",
+		FailOn:  []string{"Golang errors in file"},
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: анализатор сообщил о сбое сборки")
+	}
+}
+
+func TestFailOnAllowsCleanOutput(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:      "fake",
+		Runtime: "command",
+		Command: []string{"sh", "-c", `printf '{}' > "$SGATE_OUT"`},
+		Output:  "out.sarif",
+		Timeout: "10s",
+		FailOn:  []string{"Golang errors in file"},
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err != nil {
+		t.Fatalf("чистый прогон не должен падать: %v", err)
+	}
+}

@@ -121,4 +121,6 @@ analyzers:
       GOMODCACHE: /tmp/gomodcache
     output: /out/gosec.sarif
     network: none
+    fail_on:
+      - "Golang errors in file"
     timeout: 10m
