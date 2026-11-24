@@ -1,0 +1,18 @@
+# Пример scope для DAST. Реальный scope согласуется письменно.
+target: http://127.0.0.1:3000
+allowed_hosts:
+  - 127.0.0.1
+  - localhost
+max_rps: 5
+methods:
+  allow: [GET, HEAD, OPTIONS]
+  deny: [DELETE]
+auth:
+  mode: none          # none | form | token
+  test_accounts_only: true
+exclusions:
+  - /logout
+  - /rest/user/delete
+scanners:
+  - zap-baseline
+  - nuclei
