@@ -158,6 +158,15 @@ go run ./cmd/sgatedast report -findings dast/out/findings.jsonl \
 Каждый `scan` пишет `dast/out/report.md`: сводка по severity, таблица находок,
 карта покрытия OWASP WSTG и ограничения. `-report` задаёт другой путь.
 
+## Словарь TaskTracker
+
+`feroxbuster-tt` использует `dast/wordlists/tasktracker.txt` и фильтрует 404.
+Запуск:
+
+```bash
+go run ./cmd/sgatedast scan ... -id feroxbuster-tt
+```
+
 ## Дедуп
 
 Точные повторы убираются. ZAP и nuclei на один URL с одним CWE склеиваются:

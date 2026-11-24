@@ -40,7 +40,7 @@ func ParseFeroxJSON(path, analyzerID string) ([]sarif.Finding, error) {
 		if e.Type != "" && e.Type != "response" {
 			continue
 		}
-		if e.URL == "" {
+		if e.URL == "" || e.Status == 404 {
 			continue
 		}
 		sev := "info"
