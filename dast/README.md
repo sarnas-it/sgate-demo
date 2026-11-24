@@ -90,6 +90,12 @@ go run ./cmd/sgatedast scan -scope ../dast/scope.example.yaml \
 
 На Juice Shop: feroxbuster нашёл 5 путей (info), nuclei high/critical — 0.
 
+## Дедуп
+
+Точные повторы (один fingerprint или `analyzer + rule + file + message`)
+убираются. Разные сканеры на один URL остаются раздельно — их склейка будет
+отдельным шагом B6.
+
 ## Артефакты
 
 - `report.json`, `report.md`, `report.html` — в `dast/out/`;

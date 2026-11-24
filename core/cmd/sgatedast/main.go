@@ -129,6 +129,7 @@ func runScan(args []string) {
 	if err != nil {
 		fail(err)
 	}
+	findings = dast.Dedup(findings)
 	// В отчёт попадают только URL внутри scope.
 	filtered := findings[:0]
 	for _, f := range findings {
