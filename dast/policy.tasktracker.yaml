@@ -1,0 +1,15 @@
+# Политика DAST для закрытого пилота TaskTracker.
+block: [critical, high]
+warn: [medium]
+ignore: [low, info]
+
+exceptions:
+  - rule: "10098"
+    path: /api/v1
+    owner: "Sarnas / TaskTracker"
+    expires: "2026-12-31"
+    reason: "CORS * на API; пересмотреть с gateway и доменами"
+  - rule: "90003"
+    owner: "Sarnas / TaskTracker"
+    expires: "2026-12-31"
+    reason: "SRI для собранных ассетов; добавить в сборку UI"
