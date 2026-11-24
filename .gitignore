@@ -11,6 +11,10 @@ guardrail.sarif
 semgrep.sarif
 trivy.sarif
 
+# результаты запусков и разметка — артефакты, не исходники
+.sgate/
+core/.sgate/
+
 # demo artifacts
 .demo-worktrees/
 .demo-out/

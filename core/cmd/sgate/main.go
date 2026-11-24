@@ -15,16 +15,30 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"code.sarnas.ru/sgate/internal/analyzer"
 	"code.sarnas.ru/sgate/internal/baseline"
 	"code.sarnas.ru/sgate/internal/config"
 	"code.sarnas.ru/sgate/internal/detect"
+	"code.sarnas.ru/sgate/internal/gost"
+	"code.sarnas.ru/sgate/internal/marking"
 	"code.sarnas.ru/sgate/internal/policy"
+	"code.sarnas.ru/sgate/internal/runs"
 	"code.sarnas.ru/sgate/internal/sarif"
 )
 
 func main() {
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		code, err := runSubcommand(os.Args[1:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "sgate:", err)
+			if code == 0 {
+				code = 2
+			}
+		}
+		os.Exit(code)
+	}
 	repo := flag.String("repo", ".", "путь к репозиторию")
 	cfgPath := flag.String("config", "analyzers.yaml", "путь к analyzers.yaml")
 	format := flag.String("format", "text", "text, json или sarif")
@@ -38,9 +52,11 @@ func main() {
 	headRef := flag.String("head", "HEAD", "ревизия для diff-only")
 	cacheDir := flag.String("cache-dir", ".sgate-cache", "каталог кэша анализаторов")
 	noCache := flag.Bool("no-cache", false, "не использовать кэш")
+	recordDir := flag.String("record", "", "сохранить запуск в хранилище результатов (ГОСТ 8.8)")
+	marksPath := flag.String("markings", "", "файл разметки предупреждений (ГОСТ 5.5, 8.6)")
 	flag.Parse()
 
-	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose, *baselinePath, *writeBaseline, *baseRef, *headRef, *cacheDir, *noCache)
+	code, err := run(*repo, *cfgPath, *format, *block, *list, *keep, *verbose, *baselinePath, *writeBaseline, *baseRef, *headRef, *cacheDir, *noCache, *recordDir, *marksPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sgate:", err)
 		if code == 0 {
@@ -133,6 +149,19 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, b, 0o644)
 }
 
+// withoutMarked убирает из блокирующих находки, по которым уже принято
+// решение «ложное» или «принято» (5.5): они не должны останавливать сборку.
+func withoutMarked(findings []sarif.Finding) []sarif.Finding {
+	out := findings[:0]
+	for _, f := range findings {
+		if f.Marking == string(marking.False) || f.Marking == string(marking.Accepted) {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 func countBaseline(findings []sarif.Finding) int {
 	n := 0
 	for _, f := range findings {
@@ -152,7 +181,8 @@ func requiresPresent(repo string, requires []string) bool {
 	return true
 }
 
-func run(repo, cfgPath, format, block string, list, keep, verbose bool, baselinePath, writeBaseline, baseRef, headRef, cacheDir string, noCache bool) (int, error) {
+func run(repo, cfgPath, format, block string, list, keep, verbose bool, baselinePath, writeBaseline, baseRef, headRef, cacheDir string, noCache bool, recordDir, marksPath string) (int, error) {
+	started := time.Now()
 	repoAbs, err := filepath.Abs(repo)
 	if err != nil {
 		return 2, err
@@ -273,6 +303,19 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 	}
 
 	findings = filterExcluded(findings, cfg.Exclude)
+	// 8.5: каждый результат получает тип ошибки по 6.3, CWE и описание.
+	for i := range findings {
+		gost.Assign(&findings[i])
+	}
+	// 5.5/8.6: применяем выполненную ранее разметку.
+	var marks *marking.Store
+	if marksPath != "" {
+		marks, err = marking.Load(marksPath)
+		if err != nil {
+			return 2, err
+		}
+		marks.Apply(findings)
+	}
 	if baseRef != "" {
 		if files, err := changedFiles(repoAbs, baseRef, headRef); err == nil {
 			findings = filterChanged(findings, files)
@@ -305,6 +348,44 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 		return findings[i].Line < findings[j].Line
 	})
 	blocking := policy.Blocking(findings, block)
+	// Разметка «ложное» и «принято» снимает блокировку: решение уже принято
+	// человеком и зафиксировано с владельцем и сроком (5.5, 5.9).
+	if marks != nil {
+		blocking = withoutMarked(blocking)
+	}
+
+	// 8.8: результаты каждого запуска сохраняются в хранилище результатов.
+	if recordDir != "" {
+		analyzerIDs := make([]string, 0, len(selected))
+		for _, a := range selected {
+			analyzerIDs = append(analyzerIDs, a.ID)
+		}
+		runRec := runs.Run{
+			Meta: runs.Meta{
+				ID:         runs.NewID(started),
+				Repo:       repoAbs,
+				Commit:     commit,
+				Config:     cfgAbs,
+				Started:    started.UTC(),
+				DurationMS: time.Since(started).Milliseconds(),
+				Analyzers:  analyzerIDs,
+				Failed:     failed,
+				Total:      len(findings),
+			},
+			Findings: findings,
+		}
+		if marks != nil {
+			runRec.Meta.Marking = map[string]int{}
+			for c, n := range marks.Summary() {
+				runRec.Meta.Marking[string(c)] = n
+			}
+		}
+		dir, err := runs.Save(recordDir, runRec)
+		if err != nil {
+			return 2, fmt.Errorf("record run: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "запуск сохранён: %s\n", dir)
+	}
 
 	if format == "sarif" {
 		if err := sarif.Write(os.Stdout, findings, "SGATE"); err != nil {
@@ -330,12 +411,21 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 	} else {
 		for _, f := range findings {
 			mark := "warn "
-			if f.Baseline {
+			switch {
+			case f.Marking == string(marking.False):
+				mark = "false"
+			case f.Marking == string(marking.Accepted):
+				mark = "accept"
+			case f.Baseline:
 				mark = "base "
-			} else if policy.Rank(f.Severity) >= policy.Rank(block) {
+			case policy.Rank(f.Severity) >= policy.Rank(block):
 				mark = "BLOCK"
 			}
-			fmt.Printf("[%s] %s:%d %s %s — %s\n", mark, f.File, f.Line, f.Severity, f.RuleID, f.Message)
+			typ := ""
+			if f.GOSTType != "" {
+				typ = " [" + f.GOSTType + "]"
+			}
+			fmt.Printf("[%s] %s:%d %s %s%s — %s\n", mark, f.File, f.Line, f.Severity, f.RuleID, typ, f.Message)
 		}
 		fmt.Fprintf(os.Stderr, "итог: %d находок, %d baseline, %d блокирующих, анализаторов %d, ошибок %d\n",
 			len(findings), countBaseline(findings), len(blocking), len(selected)-len(failed), len(failed))

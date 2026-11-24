@@ -23,6 +23,12 @@ type Finding struct {
 	Line        int    `json:"line"`
 	Fingerprint string `json:"fingerprint"`
 	Baseline    bool   `json:"baseline,omitempty"`
+	// GOSTType — тип критической ошибки по ГОСТ Р 71207-2024 (6.3).
+	GOSTType string `json:"gost_type,omitempty"`
+	// Description — краткое описание ошибки (8.5 б).
+	Description string `json:"description,omitempty"`
+	// Marking — категория разметки по 5.5: true, false, accepted.
+	Marking string `json:"marking,omitempty"`
 }
 
 type report struct {
@@ -248,7 +254,7 @@ func ParseBanditJSON(file, analyzerID string) ([]Finding, error) {
 			File:     cleanPath(res.Filename),
 			Line:     res.LineNumber,
 		}
-		f.Fingerprint = hashFingerprint(f.Analyzer, f.RuleID, f.File, strconv.Itoa(f.Line), f.Message)
+		f.Fingerprint = hashFingerprint(f.Analyzer, f.RuleID, f.File, f.Message)
 		out = append(out, f)
 	}
 	return out, nil
@@ -280,5 +286,8 @@ func fingerprint(res result, analyzerID, file string, line int) string {
 			}
 		}
 	}
-	return hashFingerprint(analyzerID, res.RuleID, file, strconv.Itoa(line), res.Message.Text)
+	// Строка намеренно не входит в отпечаток: правка выше по файлу не должна
+	// превращать существующую находку в новую (ГОСТ Р 71207-2024, 8.9 —
+	// сравнение запусков и сохранение разметки).
+	return hashFingerprint(analyzerID, res.RuleID, file, res.Message.Text)
 }

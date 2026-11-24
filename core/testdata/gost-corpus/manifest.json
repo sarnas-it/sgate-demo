@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "tolerance": 1,
+  "clean": [
+    "clean/handlers.go"
+  ],
+  "defects": [
+    {
+      "file": "bounds/slice.go",
+      "line": 11,
+      "type": "6.3в",
+      "cwe": "CWE-125",
+      "note": "индекс из запроса без проверки границ"
+    },
+    {
+      "file": "creds/hardcoded.go",
+      "line": 4,
+      "type": "6.3г",
+      "cwe": "CWE-798",
+      "note": "небезопасный примитив или права доступа"
+    },
+    {
+      "file": "crypto/md5.go",
+      "line": 9,
+      "type": "6.3г",
+      "cwe": "CWE-327",
+      "note": "небезопасный примитив или права доступа"
+    },
+    {
+      "file": "crypto/rand.go",
+      "line": 11,
+      "type": "6.3г",
+      "cwe": "CWE-338",
+      "note": "небезопасный примитив или права доступа"
+    },
+    {
+      "file": "crypto/tls.go",
+      "line": 9,
+      "type": "6.3г",
+      "cwe": "CWE-295",
+      "note": "небезопасный примитив или права доступа"
+    },
+    {
+      "file": "overflow/convert.go",
+      "line": 5,
+      "type": "6.3б",
+      "cwe": "CWE-190",
+      "note": "сужение разрядности без проверки"
+    },
+    {
+      "file": "perms/file.go",
+      "line": 9,
+      "type": "6.3г",
+      "cwe": "CWE-276",
+      "note": "небезопасный примитив или права доступа"
+    },
+    {
+      "file": "taint/exec.go",
+      "line": 11,
+      "type": "6.3а",
+      "cwe": "CWE-78",
+      "note": "непроверенные данные в опасном стоке"
+    },
+    {
+      "file": "taint/path.go",
+      "line": 11,
+      "type": "6.3а",
+      "cwe": "CWE-22",
+      "note": "непроверенные данные в опасном стоке"
+    },
+    {
+      "file": "taint/sql.go",
+      "line": 11,
+      "type": "6.3а",
+      "cwe": "CWE-89",
+      "note": "непроверенные данные в опасном стоке"
+    },
+    {
+      "file": "taint/ssrf.go",
+      "line": 10,
+      "type": "6.3а",
+      "cwe": "CWE-918",
+      "note": "непроверенные данные в опасном стоке"
+    },
+    {
+      "file": "taint/xss.go",
+      "line": 11,
+      "type": "6.3а",
+      "cwe": "CWE-79",
+      "note": "непроверенные данные в опасном стоке"
+    }
+  ]
+}
