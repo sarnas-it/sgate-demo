@@ -1,0 +1,26 @@
+id: sgate-exposed-env
+
+info:
+  name: Exposed .env file
+  author: sarnas
+  severity: high
+  tags: sgate,exposure
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.env"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: regex
+        part: body
+        regex:
+          - "(?m)^[A-Za-z_][A-Za-z0-9_]*="
+      - type: word
+        part: body
+        words:
+          - "<html"
+        negative: true
