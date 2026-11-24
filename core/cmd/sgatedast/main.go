@@ -29,6 +29,8 @@ func main() {
 		runScan(os.Args[2:])
 	case "passive":
 		runPassive(os.Args[2:])
+	case "report":
+		runReport(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -77,6 +79,7 @@ func runPassive(args []string) {
 	scopePath := fs.String("scope", "dast/scope.example.yaml", "путь к scope")
 	out := fs.String("out", "dast/out/passive.json", "JSON-отчёт")
 	sarifOut := fs.String("sarif-out", "", "SARIF-отчёт")
+	findingsOut := fs.String("findings-out", "", "дописать находки в общий JSONL")
 	block := fs.String("block", "high", "порог блокировки")
 	fs.Parse(args)
 
@@ -105,6 +108,11 @@ func runPassive(args []string) {
 	if err := os.WriteFile(*out, append(b, '\n'), 0o644); err != nil {
 		fail(err)
 	}
+	if *findingsOut != "" {
+		if err := dast.AppendFindings(*findingsOut, findings); err != nil {
+			fail(err)
+		}
+	}
 	if *sarifOut != "" {
 		if err := writeSARIF(*sarifOut, findings); err != nil {
 			fail(err)
@@ -128,6 +136,7 @@ func runScan(args []string) {
 	confirm := fs.Bool("confirm", false, "подтвердить согласованный стенд")
 	reportPath := fs.String("report", "", "путь к markdown-отчёту (по умолчанию out/report.md)")
 	sarifOut := fs.String("sarif-out", "", "SARIF-отчёт")
+	findingsOut := fs.String("findings-out", "", "дописать находки в общий JSONL")
 	fs.Parse(args)
 
 	if !*confirm && os.Getenv("DAST_CONFIRM") != "1" {
@@ -238,6 +247,11 @@ func runScan(args []string) {
 		f.Close()
 		fmt.Fprintf(os.Stderr, "markdown-отчёт: %s\n", report)
 	}
+	if *findingsOut != "" {
+		if err := dast.AppendFindings(*findingsOut, findings); err != nil {
+			fail(err)
+		}
+	}
 	if *sarifOut != "" {
 		if err := writeSARIF(*sarifOut, findings); err != nil {
 			fail(err)
@@ -253,6 +267,75 @@ func runScan(args []string) {
 func dastPolicyBlocking(p *dast.Policy, f sarif.Finding) bool {
 	blocking, _, _ := p.Evaluate([]sarif.Finding{f})
 	return len(blocking) > 0
+}
+
+func runReport(args []string) {
+	fs := flag.NewFlagSet("report", flag.ExitOnError)
+	findingsPath := fs.String("findings", "", "JSONL с находками")
+	outDir := fs.String("out", "dast/out", "каталог отчётов")
+	target := fs.String("target", "", "цель для отчёта")
+	policyPath := fs.String("policy", "", "путь к dast/policy.yaml")
+	block := fs.String("block", "high", "порог, если нет policy")
+	sarifOut := fs.String("sarif-out", "", "SARIF-отчёт")
+	fs.Parse(args)
+	if *findingsPath == "" {
+		fail(fmt.Errorf("нужен -findings"))
+	}
+	findings, err := dast.ReadFindings(*findingsPath)
+	if err != nil {
+		fail(err)
+	}
+	findings = dast.Dedup(findings)
+	var blocking, warnings []sarif.Finding
+	excepted := 0
+	if *policyPath != "" {
+		p, err := dast.LoadPolicy(*policyPath)
+		if err != nil {
+			fail(err)
+		}
+		blocking, warnings, excepted = p.Evaluate(findings)
+	} else {
+		blocking = policy.Blocking(findings, *block)
+		for _, f := range findings {
+			if policy.Rank(f.Severity) < policy.Rank(*block) {
+				warnings = append(warnings, f)
+			}
+		}
+	}
+	seen := map[string]bool{}
+	var scanners []string
+	for _, f := range findings {
+		if !seen[f.Analyzer] {
+			seen[f.Analyzer] = true
+			scanners = append(scanners, f.Analyzer)
+		}
+	}
+	if err := os.MkdirAll(*outDir, 0o755); err != nil {
+		fail(err)
+	}
+	reportPath := filepath.Join(*outDir, "report.md")
+	f, err := os.Create(reportPath)
+	if err != nil {
+		fail(err)
+	}
+	if err := dast.WriteMarkdown(f, dast.Report{
+		Target: *target, Scanners: scanners, Findings: findings,
+		Blocking: len(blocking), Warnings: len(warnings), Excepted: excepted,
+	}); err != nil {
+		fail(err)
+	}
+	f.Close()
+	if *sarifOut == "" {
+		*sarifOut = filepath.Join(*outDir, "report.sarif")
+	}
+	if err := writeSARIF(*sarifOut, findings); err != nil {
+		fail(err)
+	}
+	fmt.Fprintf(os.Stderr, "сводный отчёт: %s\nSARIF: %s\nитог: %d находок, %d блокирующих, %d исключений\n",
+		reportPath, *sarifOut, len(findings), len(blocking), excepted)
+	if len(blocking) > 0 {
+		os.Exit(1)
+	}
 }
 
 func writeSARIF(path string, findings []sarif.Finding) error {
