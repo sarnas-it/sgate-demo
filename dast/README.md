@@ -99,6 +99,11 @@ go run ./cmd/sgatedast scan ... -policy ../dast/policy.yaml
 `block: [critical, high]`, `warn: [medium]`, `ignore: [low, info]`.
 Исключение требует `owner` и `expires`; просроченное не действует.
 
+## Отчёт и WSTG
+
+Каждый `scan` пишет `dast/out/report.md`: сводка по severity, таблица находок,
+карта покрытия OWASP WSTG и ограничения. `-report` задаёт другой путь.
+
 ## Дедуп
 
 Точные повторы (один fingerprint или `analyzer + rule + file + message`)
