@@ -1,3 +1,5 @@
+import { parseArgs } from "@/lib/args";
+
 const layers = [
   {
     id: "sca",
@@ -24,6 +26,8 @@ const layers = [
     text: "Образы, Dockerfile, конфигурация инфраструктуры.",
   },
 ];
+
+const argv = parseArgs(["--demo"]);
 
 export default function Page() {
   return (
