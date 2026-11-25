@@ -9,24 +9,40 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"code.sarnas.ru/sgate/internal/config"
+	"code.sarnas.ru/sgate/internal/sarif"
 )
+
+// Result — итог прогона анализатора: путь к отчёту и сколько файлов он
+// реально открыл. Второе число нужно, чтобы «0 находок» не путалось с
+// «анализатор ничего не просканировал» (ГОСТ Р 71207-2024, 8.8 — полнота).
+type Result struct {
+	Path         string
+	ScannedFiles int
+}
 
 // Run запускает анализатор и возвращает путь к SARIF-файлу на хосте.
 func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, user string) (string, error) {
+	res, err := RunDetailed(ctx, spec, repo, configDir, outDir, user)
+	return res.Path, err
+}
+
+// RunDetailed — Run вместе с числом просканированных файлов.
+func RunDetailed(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, user string) (Result, error) {
 	timeout, err := time.ParseDuration(spec.Timeout)
 	if err != nil {
-		return "", fmt.Errorf("%s: timeout: %w", spec.ID, err)
+		return Result{}, fmt.Errorf("%s: timeout: %w", spec.ID, err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	hostOut := hostOutput(spec, repo, outDir)
 	if err := os.MkdirAll(filepath.Dir(hostOut), 0o755); err != nil {
-		return "", fmt.Errorf("%s: output dir: %w", spec.ID, err)
+		return Result{}, fmt.Errorf("%s: output dir: %w", spec.ID, err)
 	}
 
 	var cmd *exec.Cmd
@@ -34,12 +50,12 @@ func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, use
 	case "docker":
 		args, err := dockerArgs(spec, repo, configDir, outDir, user)
 		if err != nil {
-			return "", err
+			return Result{}, err
 		}
 		cmd = exec.CommandContext(ctx, "docker", args...)
 	case "command":
 		if len(spec.Command) == 0 {
-			return "", fmt.Errorf("%s: empty command", spec.ID)
+			return Result{}, fmt.Errorf("%s: empty command", spec.ID)
 		}
 		cmd = exec.CommandContext(ctx, spec.Command[0], spec.Command[1:]...)
 		cmd.Dir = repo
@@ -51,7 +67,7 @@ func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, use
 			cmd.Env = append(cmd.Env, k+"="+v)
 		}
 	default:
-		return "", fmt.Errorf("%s: unsupported runtime %q", spec.ID, spec.Runtime)
+		return Result{}, fmt.Errorf("%s: unsupported runtime %q", spec.ID, spec.Runtime)
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -72,28 +88,71 @@ func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, use
 			if len(msg) > 4000 {
 				msg = msg[len(msg)-4000:]
 			}
-			return "", fmt.Errorf("%s: %w: %s", spec.ID, err, msg)
+			return Result{}, fmt.Errorf("%s: %w: %s", spec.ID, err, msg)
 		}
 	}
 	if spec.CaptureStdout {
 		if err := os.WriteFile(hostOut, stdout.Bytes(), 0o644); err != nil {
-			return "", fmt.Errorf("%s: write stdout: %w", spec.ID, err)
+			return Result{}, fmt.Errorf("%s: write stdout: %w", spec.ID, err)
 		}
 	}
 	if _, err := os.Stat(hostOut); err != nil {
-		return "", fmt.Errorf("%s: SARIF not found at %s: %w", spec.ID, hostOut, err)
+		return Result{}, fmt.Errorf("%s: SARIF not found at %s: %w", spec.ID, hostOut, err)
 	}
+	output := stderr.String() + "\n" + stdout.String()
 	// Нулевой код возврата не гарантирует, что анализ состоялся: часть
 	// анализаторов печатает ошибку сборки и отдаёт пустой отчёт. Такие
 	// срабатывания считаем сбоем, иначе «0 находок» — ложное отрицание.
-	if marker := matchFailOn(spec.FailOn, stderr.String()+"\n"+stdout.String()); marker != "" {
+	if marker := matchFailOn(spec.FailOn, output); marker != "" {
 		msg := strings.TrimSpace(stderr.String())
 		if len(msg) > 1500 {
 			msg = msg[len(msg)-1500:]
 		}
-		return "", fmt.Errorf("%s: анализатор сообщил о сбое (%q), отчёт неполный: %s", spec.ID, marker, msg)
+		return Result{}, fmt.Errorf("%s: анализатор сообщил о сбое (%q), отчёт неполный: %s", spec.ID, marker, msg)
 	}
-	return hostOut, nil
+	// Полнота прогона: «0 находок» от анализатора, который не открыл ни одного
+	// файла, — не «чисто», а несостоявшийся анализ. Проверяем двумя способами:
+	// по прогрессу в логе (gosec: «Checking file: …») и по artifacts в SARIF.
+	scanned, err := countScanned(spec, output, hostOut)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{Path: hostOut, ScannedFiles: scanned}, nil
+}
+
+// countScanned определяет, сколько файлов анализатор реально открыл.
+// ScannedRegex приоритетнее: он видит прогресс даже у отчётов, где artifacts
+// не заполнены. RequireArtifacts — второй, независимый признак.
+func countScanned(spec config.Analyzer, output, reportPath string) (int, error) {
+	if spec.ScannedRegex != "" {
+		re, err := regexp.Compile(spec.ScannedRegex)
+		if err != nil {
+			return 0, fmt.Errorf("%s: scanned_regex: %w", spec.ID, err)
+		}
+		seen := map[string]struct{}{}
+		for _, m := range re.FindAllStringSubmatch(output, -1) {
+			if len(m) > 1 && m[1] != "" {
+				seen[m[1]] = struct{}{}
+			}
+		}
+		if len(seen) < spec.MinScannedFiles {
+			return len(seen), fmt.Errorf(
+				"%s: просканировано %d файлов, ожидалось не меньше %d — анализ не состоялся (отчёт пустой или неполный)",
+				spec.ID, len(seen), spec.MinScannedFiles)
+		}
+		return len(seen), nil
+	}
+	if spec.RequireArtifacts {
+		n, err := sarif.CountArtifacts(reportPath)
+		if err != nil {
+			return 0, fmt.Errorf("%s: artifacts: %w", spec.ID, err)
+		}
+		if n == 0 {
+			return 0, fmt.Errorf("%s: отчёт не содержит artifacts — анализатор не открыл ни одного файла, «0 находок» недостоверно", spec.ID)
+		}
+		return n, nil
+	}
+	return 0, nil
 }
 
 // matchFailOn возвращает первую подстроку из списка, найденную в выводе.

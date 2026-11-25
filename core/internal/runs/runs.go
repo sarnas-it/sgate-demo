@@ -26,6 +26,11 @@ type Meta struct {
 	Failed     []string       `json:"failed,omitempty"`
 	Total      int            `json:"total"`
 	Marking    map[string]int `json:"marking,omitempty"`
+	// Coverage — сколько файлов реально открыл каждый анализатор. Нужно,
+	// чтобы отличить «чисто» от «анализатор ничего не просканировал»:
+	// ГОСТ Р 71207-2024, 8.8 — результаты запуска сохраняются вместе с
+	// условиями его выполнения.
+	Coverage map[string]int `json:"coverage,omitempty"`
 }
 
 // Run — сохранённый результат запуска.

@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -46,6 +47,18 @@ type Analyzer struct {
 	// «Golang errors in file», не смог собрать пакеты и отдаёт пустой SARIF
 	// с кодом 0 — без этой проверки SGATE показывал бы «0 находок».
 	FailOn []string `yaml:"fail_on"`
+	// RequireArtifacts — требовать непустой runs[].artifacts в SARIF: пустой
+	// список означает, что анализатор не открыл ни одного файла, и «0 находок»
+	// тогда — не «чисто», а несостоявшийся прогон.
+	RequireArtifacts bool `yaml:"require_artifacts"`
+	// ScannedRegex — регулярка с одной группой по объединённому stdout/stderr;
+	// каждое совпадение считается просканированным файлом. Нужна для
+	// анализаторов, которые пишут прогресс в лог (gosec: «Checking file: …»)
+	// и при ошибке сборки отдают пустой отчёт с кодом 0.
+	ScannedRegex string `yaml:"scanned_regex"`
+	// MinScannedFiles — минимум совпадений ScannedRegex, иначе прогон — сбой.
+	// По умолчанию 1, если ScannedRegex задан.
+	MinScannedFiles int `yaml:"min_scanned_files"`
 }
 
 // Config — корневой файл analyzers.yaml.
@@ -119,6 +132,22 @@ func Load(path string) (*Config, error) {
 		case "sarif", "bandit-json", "phpstan-json":
 		default:
 			return nil, fmt.Errorf("%s: unsupported format %q", a.ID, a.Format)
+		}
+		// Покрытие: пустой отчёт с кодом 0 неотличим от «чисто», поэтому
+		// анализатор либо обязан вернуть артефакты, либо подтвердить прогресс
+		// строкой в логе. ScannedRegex компилируется здесь, чтобы опечатка в
+		// конфиге падала на старте, а не молча отключала проверку.
+		if a.ScannedRegex != "" {
+			re, err := regexp.Compile(a.ScannedRegex)
+			if err != nil {
+				return nil, fmt.Errorf("%s: scanned_regex: %w", a.ID, err)
+			}
+			if re.NumSubexp() < 1 {
+				return nil, fmt.Errorf("%s: scanned_regex must have a capture group", a.ID)
+			}
+			if a.MinScannedFiles <= 0 {
+				a.MinScannedFiles = 1
+			}
 		}
 	}
 	return &c, nil

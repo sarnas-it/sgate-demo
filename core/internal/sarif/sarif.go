@@ -36,8 +36,14 @@ type report struct {
 }
 
 type run struct {
-	Tool    tool     `json:"tool"`
-	Results []result `json:"results"`
+	Tool      tool       `json:"tool"`
+	Results   []result   `json:"results"`
+	Artifacts []artifact `json:"artifacts"`
+}
+
+// artifact — запись runs[].artifacts: файл, который анализатор открыл.
+type artifact struct {
+	Location artifactLocation `json:"location"`
 }
 
 type tool struct {
@@ -102,6 +108,29 @@ func ParseFile(file, analyzerID, format string) ([]Finding, error) {
 	default:
 		return nil, fmt.Errorf("unsupported format %q", format)
 	}
+}
+
+// CountArtifacts возвращает число файлов, которые анализатор открыл, по
+// runs[].artifacts SARIF-отчёта. Нужен как признак полноты прогона: пустой
+// список при нуле находок означает «анализ не состоялся», а не «чисто».
+func CountArtifacts(file string) (int, error) {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return 0, fmt.Errorf("read sarif: %w", err)
+	}
+	var r report
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return 0, fmt.Errorf("parse sarif: %w", err)
+	}
+	seen := map[string]struct{}{}
+	for _, run := range r.Runs {
+		for _, a := range run.Artifacts {
+			if uri := a.Location.URI; uri != "" {
+				seen[uri] = struct{}{}
+			}
+		}
+	}
+	return len(seen), nil
 }
 
 // Parse читает SARIF-файл и возвращает находки. Пустой runs/results — не ошибка.
