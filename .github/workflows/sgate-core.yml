@@ -6,14 +6,20 @@ on:
       - "core/**"
       - "dast/**"
       - "docs/adr/**"
+      - "sast-rules/**"
+      - "fixtures/sast-rules/**"
       - "scripts/check-pins.sh"
+      - "scripts/check-rules.sh"
   push:
     branches: [main]
     paths:
       - "core/**"
       - "dast/**"
       - "docs/adr/**"
+      - "sast-rules/**"
+      - "fixtures/sast-rules/**"
       - "scripts/check-pins.sh"
+      - "scripts/check-rules.sh"
 
 jobs:
   test:
@@ -31,3 +37,13 @@ jobs:
           cd core
           go test ./...
           go vet ./...
+
+  # Правила SAST проверяются на фикстурах с аннотациями ruleid:/ok:.
+  # Без этого слишком широкое правило начинает шуметь на защищённом коде,
+  # а слишком узкое — молча перестаёт ловить (оба случая были в пилотах).
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SAST rules against fixtures
+        run: ./scripts/check-rules.sh
