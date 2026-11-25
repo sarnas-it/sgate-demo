@@ -131,3 +131,22 @@ analyzers:
     scanned_regex: 'Checking file: (\S+)'
     min_scanned_files: 1
     timeout: 10m
+
+  # AST-анализатор — отдельный модуль (analyzers/ast), а не часть ядра.
+  # Контракт тот же, что у любого анализатора: SGATE_REPO/SGATE_OUT → SARIF,
+  # прогресс «ast-scanned: …» для coverage guard. Язык меняется заменой
+  # модуля, интерфейс в analyzers.yaml остаётся.
+  - id: ast
+    languages: [go]
+    requires: [go.mod]
+    runtime: command
+    # Модуль анализатора живёт рядом с конфигом (SGATE_CONFIG_DIR), а
+    # анализируется другой репозиторий — поэтому запуск через sh с cd.
+    command:
+      - sh
+      - -c
+      - 'cd "$SGATE_CONFIG_DIR/.." && exec go run ./analyzers/ast'
+    output: .sgate-ast.sarif
+    timeout: 5m
+    scanned_regex: 'ast-scanned: (\S+)'
+    min_scanned_files: 1

@@ -37,22 +37,27 @@ func TestCatalogConsistency(t *testing.T) {
 		byID[e.ID] = e
 	}
 	for _, a := range cfg.Analyzers {
-		if !digestRE.MatchString(a.Image) {
-			t.Errorf("%s: image not pinned by digest: %s", a.ID, a.Image)
-		}
 		e, ok := byID[a.ID]
 		if !ok {
 			t.Errorf("%s: missing in analyzers.lock", a.ID)
 			continue
 		}
-		if e.Image != a.Image {
-			t.Errorf("%s: lock image %s != config %s", a.ID, e.Image, a.Image)
-		}
 		if e.License == "" || !strings.HasPrefix(e.Source, "https://") {
 			t.Errorf("%s: incomplete catalog entry: %+v", a.ID, e)
 		}
-		if !strings.HasPrefix(a.Output, "/out/") {
-			t.Errorf("%s: docker output must be under /out: %s", a.ID, a.Output)
+		// Требования к образу относятся только к docker-анализаторам.
+		// Командный анализатор — модуль в этом же репозитории: у него нет
+		// digest, а отчёт пишется в рабочее дерево, не в /out.
+		if a.Runtime == "docker" {
+			if !digestRE.MatchString(a.Image) {
+				t.Errorf("%s: image not pinned by digest: %s", a.ID, a.Image)
+			}
+			if e.Image != a.Image {
+				t.Errorf("%s: lock image %s != config %s", a.ID, e.Image, a.Image)
+			}
+			if !strings.HasPrefix(a.Output, "/out/") {
+				t.Errorf("%s: docker output must be under /out: %s", a.ID, a.Output)
+			}
 		}
 		switch a.Format {
 		case "sarif", "bandit-json", "phpstan-json":

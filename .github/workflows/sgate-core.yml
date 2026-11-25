@@ -5,6 +5,8 @@ on:
     paths:
       - "core/**"
       - "dast/**"
+      - "analyzers/**"
+      - "go.work"
       - "docs/adr/**"
       - "sast-rules/**"
       - "fixtures/sast-rules/**"
@@ -15,6 +17,8 @@ on:
     paths:
       - "core/**"
       - "dast/**"
+      - "analyzers/**"
+      - "go.work"
       - "docs/adr/**"
       - "sast-rules/**"
       - "fixtures/sast-rules/**"
@@ -35,6 +39,12 @@ jobs:
       - name: Test and vet
         run: |
           cd core
+          go test ./...
+          go vet ./...
+      # Анализаторы — отдельные модули: у них свои тесты и свой go.mod.
+      - name: Test analyzers
+        run: |
+          cd analyzers/ast
           go test ./...
           go vet ./...
 

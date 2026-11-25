@@ -62,6 +62,11 @@ func RunDetailed(ctx context.Context, spec config.Analyzer, repo, configDir, out
 		cmd.Env = append(os.Environ(),
 			"SGATE_REPO="+repo,
 			"SGATE_OUT="+hostOut,
+			// SGATE_CONFIG_DIR — каталог analyzers.yaml. Нужен анализаторам,
+			// которые живут рядом с конфигом (отдельные модули в этом же
+			// репозитории), а сканируют другой репозиторий: `go run` должен
+			// запускаться из своего модуля, а не из анализируемого каталога.
+			"SGATE_CONFIG_DIR="+configDir,
 		)
 		for k, v := range spec.Env {
 			cmd.Env = append(cmd.Env, k+"="+v)
