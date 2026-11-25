@@ -6,6 +6,7 @@
     {"id":"gosec","image":"securego/gosec@sha256:2cf71ea78210c496c65e3a987576a9c8317b68e20f2960520b3f6f8f9f539be5","license":"Apache-2.0","source":"https://github.com/securego/gosec"},
     {"id":"bandit","image":"cytopia/bandit@sha256:817a97b34d684ae7f6efc6080b6b8b57da86e0fd7154816e9ea10bfffc48ddbd","license":"Apache-2.0","source":"https://github.com/PyCQA/bandit"},
     {"id":"phpstan","image":"ghcr.io/phpstan/phpstan@sha256:a37607d838fa6e25d1debdd0f774021c2be91248e74126c32283c3d6d2ed1a0b","license":"MIT","source":"https://github.com/phpstan/phpstan"},
-    {"id":"psalm","image":"ghcr.io/psalm/psalm@sha256:aaa6f374af93863832e89d74255f8c44997fbd9244bb66334d19d8ea4f9c285b","license":"MIT","source":"https://github.com/vimeo/psalm"}
+    {"id":"psalm","image":"ghcr.io/psalm/psalm@sha256:aaa6f374af93863832e89d74255f8c44997fbd9244bb66334d19d8ea4f9c285b","license":"MIT","source":"https://github.com/vimeo/psalm"},
+    {"id":"ast","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/ast"}
   ]
 }
