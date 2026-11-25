@@ -90,3 +90,111 @@ func TestFailOnAllowsCleanOutput(t *testing.T) {
 		t.Fatalf("чистый прогон не должен падать: %v", err)
 	}
 }
+
+// TestScannedRegexMarksEmptyRunAsFailure — анализатор может отдать пустой отчёт
+// с кодом 0, не напечатав ни одной строки прогресса: gosec при ошибке
+// тулчейна/сети делает именно так. Без проверки покрытия это «0 находок».
+func TestScannedRegexMarksEmptyRunAsFailure(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:              "fake",
+		Runtime:         "command",
+		Command:         []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Checking file: (\S+)`,
+		MinScannedFiles: 1,
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: ни одного просканированного файла")
+	}
+}
+
+func TestScannedRegexCountsUniqueFiles(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:      "fake",
+		Runtime: "command",
+		Command: []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT";
+			echo "Checking file: /src/a.go"; echo "Checking file: /src/a.go"; echo "Checking file: /src/b.go" >&2`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Checking file: (\S+)`,
+		MinScannedFiles: 2,
+	}
+	res, err := RunDetailed(context.Background(), spec, out, out, out, "")
+	if err != nil {
+		t.Fatalf("прогон с прогрессом не должен падать: %v", err)
+	}
+	if res.ScannedFiles != 2 {
+		t.Fatalf("ScannedFiles = %d, want 2 (уникальные файлы)", res.ScannedFiles)
+	}
+}
+
+func TestScannedRegexBelowMinimumFails(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:              "fake",
+		Runtime:         "command",
+		Command:         []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"; echo "Checking file: /src/a.go"`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Checking file: (\S+)`,
+		MinScannedFiles: 5,
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: файлов меньше минимума")
+	}
+}
+
+// TestRequireArtifactsRejectsEmptyReport — второй, независимый признак
+// полноты: semgrep всегда пишет artifacts, и пустой список значит, что
+// анализатор не открыл ни одного файла.
+func TestRequireArtifactsRejectsEmptyReport(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:               "fake",
+		Runtime:          "command",
+		Command:          []string{"sh", "-c", `printf '{"runs":[{"results":[],"artifacts":[]}]}' > "$SGATE_OUT"`},
+		Output:           "out.sarif",
+		Timeout:          "10s",
+		RequireArtifacts: true,
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: artifacts пуст")
+	}
+}
+
+func TestRequireArtifactsAcceptsNonEmpty(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:               "fake",
+		Runtime:          "command",
+		Command:          []string{"sh", "-c", `printf '{"runs":[{"results":[],"artifacts":[{"location":{"uri":"a.go"}},{"location":{"uri":"b.go"}}]}]}' > "$SGATE_OUT"`},
+		Output:           "out.sarif",
+		Timeout:          "10s",
+		RequireArtifacts: true,
+	}
+	res, err := RunDetailed(context.Background(), spec, out, out, out, "")
+	if err != nil {
+		t.Fatalf("непустые artifacts не должны падать: %v", err)
+	}
+	if res.ScannedFiles != 2 {
+		t.Fatalf("ScannedFiles = %d, want 2", res.ScannedFiles)
+	}
+}
+
+// TestNoCoverageChecksKeepsOldBehaviour — без новых полей поведение прежнее.
+func TestNoCoverageChecksKeepsOldBehaviour(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:      "fake",
+		Runtime: "command",
+		Command: []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"`},
+		Output:  "out.sarif",
+		Timeout: "10s",
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err != nil {
+		t.Fatalf("без проверок покрытия пустой отчёт допустим: %v", err)
+	}
+}

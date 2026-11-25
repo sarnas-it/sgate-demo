@@ -59,3 +59,72 @@ analyzers:
 		t.Fatal("expected duplicate error")
 	}
 }
+
+// TestLoadScannedRegexDefaults — при заданном scanned_regex минимум файлов по
+// умолчанию 1: «ни одного файла» — это сбой, а не «чисто».
+func TestLoadScannedRegexDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "analyzers.yaml")
+	raw := `version: 1
+analyzers:
+  - id: gosec
+    languages: [go]
+    runtime: command
+    command: [gosec]
+    output: /out/gosec.sarif
+    scanned_regex: 'Checking file: (\S+)'
+`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Analyzers[0].MinScannedFiles != 1 {
+		t.Fatalf("MinScannedFiles = %d, want 1", c.Analyzers[0].MinScannedFiles)
+	}
+}
+
+// TestLoadRejectsBadScannedRegex — опечатка в регулярке должна падать на
+// старте, а не молча отключать проверку покрытия.
+func TestLoadRejectsBadScannedRegex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "analyzers.yaml")
+	raw := `version: 1
+analyzers:
+  - id: gosec
+    languages: [go]
+    runtime: command
+    command: [gosec]
+    output: /out/gosec.sarif
+    scanned_regex: 'Checking file: (\S+'
+`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("ожидалась ошибка компиляции scanned_regex")
+	}
+}
+
+// TestLoadRejectsScannedRegexWithoutGroup — без группы нечего считать.
+func TestLoadRejectsScannedRegexWithoutGroup(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "analyzers.yaml")
+	raw := `version: 1
+analyzers:
+  - id: gosec
+    languages: [go]
+    runtime: command
+    command: [gosec]
+    output: /out/gosec.sarif
+    scanned_regex: 'Checking file: \S+'
+`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("ожидалась ошибка: у регулярки нет группы захвата")
+	}
+}

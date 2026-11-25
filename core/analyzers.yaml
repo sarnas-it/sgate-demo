@@ -123,4 +123,9 @@ analyzers:
     network: none
     fail_on:
       - "Golang errors in file"
+    # Полнота прогона: gosec печатает строку на каждый открытый файл. Если при
+    # нулевом коде таких строк нет — анализ не состоялся, и «0 находок» нельзя
+    # отдавать как «чисто» (инцидент на broker-cml-etl: пустой отчёт с кодом 0).
+    scanned_regex: 'Checking file: (\S+)'
+    min_scanned_files: 1
     timeout: 10m

@@ -240,6 +240,8 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 	type runResult struct {
 		id       string
 		findings []sarif.Finding
+		scanned  int
+		cached   bool
 		err      error
 	}
 	results := make(chan runResult, len(selected))
@@ -255,7 +257,9 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 				if _, err := os.Stat(cached); err == nil {
 					got, err := sarif.ParseFile(cached, spec.ID, spec.Format)
 					if err == nil {
-						results <- runResult{id: spec.ID, findings: got}
+						// Покрытие из кэша неизвестно: прогон был раньше и файлы
+						// могли измениться. Помечаем, чтобы не выдумывать число.
+						results <- runResult{id: spec.ID, findings: got, cached: true}
 						return
 					}
 				}
@@ -268,21 +272,21 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 			if !keep {
 				defer os.RemoveAll(outDir)
 			}
-			path, err := analyzer.Run(context.Background(), spec, repoAbs, configDir, outDir, user)
+			res, err := analyzer.RunDetailed(context.Background(), spec, repoAbs, configDir, outDir, user)
 			if err != nil {
 				results <- runResult{id: spec.ID, err: err}
 				return
 			}
 			if key != "" {
 				_ = os.MkdirAll(cacheDir, 0o755)
-				_ = copyFile(path, filepath.Join(cacheDir, key+".out"))
+				_ = copyFile(res.Path, filepath.Join(cacheDir, key+".out"))
 			}
-			got, err := sarif.ParseFile(path, spec.ID, spec.Format)
+			got, err := sarif.ParseFile(res.Path, spec.ID, spec.Format)
 			if err != nil {
 				results <- runResult{id: spec.ID, err: fmt.Errorf("%s: %w", spec.ID, err)}
 				return
 			}
-			results <- runResult{id: spec.ID, findings: got}
+			results <- runResult{id: spec.ID, findings: got, scanned: res.ScannedFiles}
 		}(spec)
 	}
 	wg.Wait()
@@ -290,6 +294,7 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 
 	var findings []sarif.Finding
 	var failed []string
+	coverage := map[string]int{}
 	for r := range results {
 		if r.err != nil {
 			fmt.Fprintf(os.Stderr, "sgate: %v\n", r.err)
@@ -297,6 +302,9 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 			continue
 		}
 		findings = append(findings, r.findings...)
+		if !r.cached {
+			coverage[r.id] = r.scanned
+		}
 	}
 	if len(failed) == len(selected) {
 		return 2, fmt.Errorf("все анализаторы завершились ошибкой: %s", strings.Join(failed, ", "))
@@ -371,6 +379,7 @@ func run(repo, cfgPath, format, block string, list, keep, verbose bool, baseline
 				Analyzers:  analyzerIDs,
 				Failed:     failed,
 				Total:      len(findings),
+				Coverage:   coverage,
 			},
 			Findings: findings,
 		}
