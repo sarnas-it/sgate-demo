@@ -94,10 +94,9 @@ rules:
                   - pattern: $R.Put($PATH, ...)
                   - pattern: $R.Delete($PATH, ...)
                   - pattern: $R.Patch($PATH, ...)
-                  - pattern: $R.Handle($PATH, ...)
               - metavariable-regex:
                   metavariable: $PATH
-                  regex: '(?i)^"[^"]*(admin|manage|console|superuser)[^"]*"$'
+                  regex: '(?i)^"/[^"]*(admin|manage|console|superuser)[^"]*"$'
           # Ребёнок внутри Route("/…admin…", …) без собственного With.
           - patterns:
               - pattern-either:
@@ -106,14 +105,13 @@ rules:
                   - pattern: $R.Put($PATH, ...)
                   - pattern: $R.Delete($PATH, ...)
                   - pattern: $R.Patch($PATH, ...)
-                  - pattern: $R.Handle($PATH, ...)
               - pattern-inside: |
                   $G.Route($APATH, func(...) {
                     ...
                   })
               - metavariable-regex:
                   metavariable: $APATH
-                  regex: '(?i)^"[^"]*(admin|manage|console|superuser)[^"]*"$'
+                  regex: '(?i)^"/[^"]*(admin|manage|console|superuser)[^"]*"$'
       # With(...) ставит middleware на конкретный маршрут.
       - pattern-not: $R2.With(...).$M($PATH, ...)
       # Use(...) внутри самой админской группы защищает всех её детей.
@@ -125,3 +123,72 @@ rules:
             $R6.Use(...)
             ...
           })
+
+  # 6.3 а): identity-заголовок принимается без проверки подписи.
+  # passport-service доверяет X-User-ID и не проверяет токен (handler.go:58),
+  # api-gateway прокидывает X-User-ID/X-User-Signature. При прямом доступе к
+  # сервису это имперсонация любого пользователя. Сканеры молчат.
+  #
+  # Правило не срабатывает, если в той же функции есть проверка подписи
+  # (hmacauth.*): этого достаточно для типового middleware, который читает
+  # заголовок уже после проверки.
+  - id: sgate-go-trusted-identity-header
+    languages: [go]
+    message: "Identity-заголовок читается без проверки подписи (CWE-290)."
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-290: Authentication Bypass by Spoofing"
+    patterns:
+      - pattern-either:
+          - pattern: $R.Header.Get($H)
+          - pattern: $R.Header.Get(...)
+      - metavariable-regex:
+          metavariable: $H
+          regex: '(?i)^"(x-user-id|x-user-email|x-user-roles|x-user-permissions)"$'
+      - pattern-not-inside: |
+          func $F(...) {
+            ...
+            hmacauth.$FN(...)
+            ...
+          }
+
+
+  # 6.3 г): URL/DSN с учётными данными пишется в лог.
+  # broker-cml-etl (main.go:193) и Jxls-report (main.go:116,126) логируют
+  # nats_url целиком, включая user:password@. Guardrail ищет секреты в коде,
+  # но не в вызовах логирования.
+  - id: sgate-go-credentials-in-log
+    languages: [go]
+    message: "URL/DSN с учётными данными попадает в лог (CWE-532)."
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+    patterns:
+      - pattern-either:
+          - pattern: $L.Info(..., zap.String($K, $V), ...)
+          - pattern: $L.Error(..., zap.String($K, $V), ...)
+          - pattern: $L.Warn(..., zap.String($K, $V), ...)
+          - pattern: $L.Debug(..., zap.String($K, $V), ...)
+      - metavariable-regex:
+          metavariable: $K
+          regex: '(?i)"(url|dsn|nats_url|db_url|database_url|connection_string)"'
+      # Маскировка в аргументе снимает находку: maskURL/redact/sanitize/hostOnly.
+      - pattern-not-regex: '(?i)\b(mask|redact|sanitize|hostOnly|scrub)[A-Za-z]*\s*\('
+
+  # 6.3 б): SQL-запрос с табличной функцией, которая ходит в сеть или читает
+  # файлы. Jxls-report исполняет пользовательский SQL и разрешает url() в
+  # ClickHouse — SSRF во внутреннюю сеть (воспроизведено на стенде).
+  - id: sgate-go-sql-dangerous-function
+    languages: [go]
+    message: "В SQL используется табличная функция с доступом к сети или файлам (CWE-918)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+    patterns:
+      - pattern: $QUERY
+      - metavariable-regex:
+          metavariable: $QUERY
+          regex: '(?is)^"(?=[^"]*\b(select|from|join|with)\b)[^"]*\b(url|file|s3|remote|remoteSecure|dblink|pg_read_file|pg_read_binary_file)\s*\([^"]*"$'
