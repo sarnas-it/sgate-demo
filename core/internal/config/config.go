@@ -41,6 +41,11 @@ type Analyzer struct {
 	ExitCodes []int `yaml:"exit_codes"`
 	// CaptureStdout — записать stdout анализатора в output (Psalm, PHPStan).
 	CaptureStdout bool `yaml:"capture_stdout"`
+	// FailOn — подстроки, появление которых в выводе анализатора означает
+	// сбой, даже если код возврата нулевой. Пример: gosec печатает
+	// «Golang errors in file», не смог собрать пакеты и отдаёт пустой SARIF
+	// с кодом 0 — без этой проверки SGATE показывал бы «0 находок».
+	FailOn []string `yaml:"fail_on"`
 }
 
 // Config — корневой файл analyzers.yaml.

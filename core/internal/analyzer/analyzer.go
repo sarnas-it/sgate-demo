@@ -83,7 +83,27 @@ func Run(ctx context.Context, spec config.Analyzer, repo, configDir, outDir, use
 	if _, err := os.Stat(hostOut); err != nil {
 		return "", fmt.Errorf("%s: SARIF not found at %s: %w", spec.ID, hostOut, err)
 	}
+	// Нулевой код возврата не гарантирует, что анализ состоялся: часть
+	// анализаторов печатает ошибку сборки и отдаёт пустой отчёт. Такие
+	// срабатывания считаем сбоем, иначе «0 находок» — ложное отрицание.
+	if marker := matchFailOn(spec.FailOn, stderr.String()+"\n"+stdout.String()); marker != "" {
+		msg := strings.TrimSpace(stderr.String())
+		if len(msg) > 1500 {
+			msg = msg[len(msg)-1500:]
+		}
+		return "", fmt.Errorf("%s: анализатор сообщил о сбое (%q), отчёт неполный: %s", spec.ID, marker, msg)
+	}
 	return hostOut, nil
+}
+
+// matchFailOn возвращает первую подстроку из списка, найденную в выводе.
+func matchFailOn(patterns []string, output string) string {
+	for _, p := range patterns {
+		if p != "" && strings.Contains(output, p) {
+			return p
+		}
+	}
+	return ""
 }
 
 func exitAllowed(codes []int, code int) bool {

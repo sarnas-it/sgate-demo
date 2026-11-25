@@ -39,3 +39,16 @@ func TestParseDefaultConfigurationLevel(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+// TestFingerprintStableAcrossLineShift — отпечаток не должен меняться при
+// сдвиге строки: иначе разметка (5.5) и сравнение запусков (8.9) теряются.
+func TestFingerprintStableAcrossLineShift(t *testing.T) {
+	a := hashFingerprint("gosec", "G304", "a.go", "Potential file inclusion via variable")
+	b := hashFingerprint("gosec", "G304", "a.go", "Potential file inclusion via variable")
+	if a != b {
+		t.Fatal("отпечаток нестабилен")
+	}
+	if hashFingerprint("gosec", "G304", "b.go", "Potential file inclusion via variable") == a {
+		t.Fatal("отпечаток не учитывает файл")
+	}
+}

@@ -31,6 +31,7 @@ type logRule struct {
 	ID                   string               `json:"id"`
 	ShortDescription     logText              `json:"shortDescription"`
 	DefaultConfiguration defaultConfiguration `json:"defaultConfiguration"`
+	Properties           map[string]any       `json:"properties,omitempty"`
 }
 
 type logText struct {
@@ -45,6 +46,7 @@ type logResult struct {
 	Locations           []logLocation     `json:"locations"`
 	PartialFingerprints map[string]string `json:"partialFingerprints,omitempty"`
 	Suppressions        []logSuppression  `json:"suppressions,omitempty"`
+	Properties          map[string]any    `json:"properties,omitempty"`
 }
 
 type logLocation struct {
@@ -82,11 +84,24 @@ func Write(w io.Writer, findings []Finding, toolName string) error {
 		if !ok {
 			idx = len(rules)
 			ruleIndex[f.RuleID] = idx
-			rules = append(rules, logRule{
+			r := logRule{
 				ID:                   f.RuleID,
 				ShortDescription:     logText{Text: f.Message},
 				DefaultConfiguration: defaultConfiguration{Level: sarifLevel(f.Severity)},
-			})
+			}
+			if f.Description != "" || f.GOSTType != "" || f.CWE != "" {
+				r.Properties = map[string]any{}
+				if f.Description != "" {
+					r.Properties["description"] = f.Description
+				}
+				if f.GOSTType != "" {
+					r.Properties["gost_type"] = f.GOSTType
+				}
+				if f.CWE != "" {
+					r.Properties["cwe"] = f.CWE
+				}
+			}
+			rules = append(rules, r)
 		}
 		res := logResult{
 			RuleID:    f.RuleID,
@@ -102,6 +117,19 @@ func Write(w io.Writer, findings []Finding, toolName string) error {
 		}
 		if f.Fingerprint != "" {
 			res.PartialFingerprints = map[string]string{"sgate/v1": f.Fingerprint}
+		}
+		// 8.5: результат должен содержать тип ошибки и её описание.
+		if f.GOSTType != "" || f.Description != "" || f.CWE != "" {
+			res.Properties = map[string]any{}
+			if f.GOSTType != "" {
+				res.Properties["gost_type"] = f.GOSTType
+			}
+			if f.Description != "" {
+				res.Properties["description"] = f.Description
+			}
+			if f.CWE != "" {
+				res.Properties["cwe"] = f.CWE
+			}
 		}
 		if f.Baseline {
 			res.Suppressions = []logSuppression{{Kind: "external", Justification: "baseline"}}

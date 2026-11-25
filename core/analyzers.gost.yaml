@@ -1,0 +1,51 @@
+version: 1
+
+# Конфигурация для квалификационного набора ГОСТ Р 71207-2024 (п. 10.2).
+# Только офлайн-анализаторы с закреплёнными дайджестами: результаты должны
+# воспроизводиться на изолированном стенде (air-gapped), иначе измерение
+# качества (8.4) не повторяемо.
+analyzers:
+  - id: semgrep
+    languages: [go]
+    runtime: docker
+    image: semgrep/semgrep@sha256:6e1b04340e60e910fbb4ddbf3c857ab0918f064417ad5ac530014ccb3cf8c8f1
+    workdir: /src
+    command:
+      - semgrep
+      - scan
+      - --config
+      - /rules
+      - --sarif
+      - --output
+      - /out/semgrep.sarif
+      - --error
+      - --metrics=off
+      - --quiet
+    mounts:
+      - source: ../sast-rules
+        target: /rules
+        read_only: true
+    output: /out/semgrep.sarif
+    network: none
+    timeout: 10m
+
+  - id: gosec
+    languages: [go]
+    requires: [go.mod]
+    runtime: docker
+    image: securego/gosec@sha256:2cf71ea78210c496c65e3a987576a9c8317b68e20f2960520b3f6f8f9f539be5
+    workdir: /src
+    # -concurrency=1 обязателен: при параллельном анализе gosec теряет часть
+    # taint-находок (G705/G706) от запуска к запуску, и измерение 8.4
+    # перестаёт быть воспроизводимым. См. docs/gost/qualification-method.md.
+    command: [-concurrency=1, -fmt=sarif, -out=/out/gosec.sarif, ./...]
+    env:
+      GOCACHE: /tmp/gocache
+      GOMODCACHE: /tmp/gomodcache
+      GOTOOLCHAIN: local
+    output: /out/gosec.sarif
+    network: none
+    # gosec при ошибке сборки печатает это и отдаёт пустой SARIF с кодом 0.
+    fail_on:
+      - "Golang errors in file"
+    timeout: 10m

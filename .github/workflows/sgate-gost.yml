@@ -1,0 +1,63 @@
+name: sgate-gost
+
+# Соответствие ГОСТ Р 71207-2024: прогон квалификационного набора,
+# измерение качества по 8.4 (формулы 10.4/10.5) и проверка, что
+# документы типов ошибок не разъехались с кодом (8.10).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - name: Тесты
+        run: go test ./...
+
+      - name: Прогон квалификационного набора (10.2)
+        run: |
+          go run ./cmd/sgate -repo testdata/gost-corpus -config analyzers.gost.yaml \
+            -format json -record .sgate/runs > /tmp/corpus.json
+        continue-on-error: true
+
+      - name: Последний запуск
+        id: run
+        run: |
+          dir=$(ls -d .sgate/runs/*/ | sort | tail -1)
+          echo "dir=${dir%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Качество по 8.4 (порог 50 % / 50 %)
+        run: |
+          go run ./cmd/sgate quality -run "${{ steps.run.outputs.dir }}" \
+            -manifest testdata/gost-corpus/manifest.json \
+            -format markdown -out /tmp/quality-report.md
+
+      - name: Документ типов ошибок не устарел (8.10)
+        run: |
+          go run ./cmd/sgate catalog -out /tmp/error-types.md
+          diff -u "$GITHUB_WORKSPACE/docs/gost/error-types.md" /tmp/error-types.md
+
+      - name: Отчёт и запуск
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gost-quality
+          path: |
+            /tmp/quality-report.md
+            core/.sgate/runs
+          if-no-files-found: warn

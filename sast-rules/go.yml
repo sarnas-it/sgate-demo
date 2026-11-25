@@ -10,3 +10,56 @@ rules:
       - pattern-either:
           - pattern: exec.Command("sh", "-c", $CMD)
           - pattern: exec.Command("bash", "-c", $CMD)
+
+  # 6.3 г): захардкоженные учётные данные. gosec G101 не ловит `const`,
+  # поэтому правило добавлено локально и не требует сети.
+  - id: sgate-go-hardcoded-credentials
+    languages: [go]
+    message: "Учётные данные захардкожены в исходном коде (CWE-798)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+    patterns:
+      - pattern-either:
+          - pattern: const $NAME = $VALUE
+          - pattern: var $NAME = $VALUE
+          - pattern: $NAME := $VALUE
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)^(password|passwd|pwd|secret|token|apikey|api_key|access_key|private_key)$
+      # Значение — строковый литерал от 8 символов; маски из одинаковых
+      # символов (••••••••, ********) секретом не считаются.
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: '^"[^"•*]{8,}"$'
+
+  # 6.3 в): индекс среза из недоверенного источника без проверки границ.
+  - id: sgate-go-slice-index-from-input
+    languages: [go]
+    message: "Индекс среза берётся из ввода пользователя без проверки границ (CWE-125)."
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-125: Out-of-bounds Read"
+    mode: taint
+    pattern-sources:
+      - pattern: $R.URL.Query().Get(...)
+      - pattern: $R.FormValue(...)
+      - pattern: $R.PathValue(...)
+    pattern-sinks:
+      - patterns:
+          # Только срез: map[$key] с ключом из запроса — не выход за границы.
+          - pattern: "($SLICE: []$T)[$IDX]"
+          # Помеченным должен быть именно индекс, иначе правило ловит контейнер.
+          - focus-metavariable: $IDX
+    pattern-propagators:
+      - pattern: $OUT, $ERR := strconv.Atoi($IN)
+        from: $IN
+        to: $OUT
+    pattern-sanitizers:
+      # Индекс из range по тому же срезу не может выйти за его границы.
+      - pattern: for $IDX, $V := range $SLICE { ... }
+      - pattern: for $IDX := range $SLICE { ... }
+      - pattern: if $IDX < len($SLICE) { ... }
+      - pattern: if $IDX >= 0 && $IDX < len($SLICE) { ... }
