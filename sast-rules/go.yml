@@ -192,3 +192,57 @@ rules:
       - metavariable-regex:
           metavariable: $QUERY
           regex: '(?is)^"(?=[^"]*\b(select|from|join|with)\b)[^"]*\b(url|file|s3|remote|remoteSecure|dblink|pg_read_file|pg_read_binary_file)\s*\([^"]*"$'
+
+  # 6.3 а): идентичность продюсера берётся из payload без проверки подписи.
+  # broker-cml-etl: client_id читается из JSON и используется для выбора
+  # организации и фильтра удаления; подписи нет — любой держатель кредов
+  # брокера пишет и удаляет от чужого имени.
+  #
+  # Правило ловит использование ClientID/TenantID в функции, которая
+  # декодировала сообщение, если в ней нет проверки подписи (Verify).
+  - id: sgate-go-message-identity-without-signature
+    languages: [go]
+    message: "Идентичность продюсера берётся из payload без проверки подписи (CWE-290)."
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-290: Authentication Bypass by Spoofing"
+    patterns:
+      - pattern-either:
+          - pattern: $MSG.ClientID
+          - pattern: $MSG.TenantID
+      - pattern-inside: |
+          func $F(...) error {
+            ...
+            json.Unmarshal(...)
+            ...
+          }
+      - pattern-not-inside: |
+          func $F(...) error {
+            ...
+            $V.Verify(...)
+            ...
+          }
+
+  # 6.3 б): ошибка записи возвращается как временная.
+  # broker-cml-etl: постоянная ошибка (тип поля, неизвестная сущность)
+  # возвращается наверх, Watermill делает ретраи, затем Nack — сообщение
+  # доставляется вечно и занимает слот. 16 таких сообщений останавливают
+  # конвейер (воспроизведено на стенде).
+  #
+  # Правило не отличает permanent от transient — это и есть предмет проверки:
+  # без классификации ошибок и DLQ любая ошибка записи уходит в бесконечный
+  # retry.
+  - id: sgate-go-broker-write-error-retry
+    languages: [go]
+    message: "Ошибка записи возвращается как временная: постоянные ошибки уйдут в бесконечный retry, нужен DLQ (CWE-703)."
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-703: Improper Check or Handling of Exceptional Conditions"
+    patterns:
+      - pattern: |
+          if $ERR := $W.Write(...); $ERR != nil {
+            ...
+            return $ERR
+          }
