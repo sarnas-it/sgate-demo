@@ -28,3 +28,6 @@ dast/out/
 
 # SGATE analyzer cache
 .sgate-cache/
+
+# AST-анализатор (command runtime)
+.sgate-ast.sarif
