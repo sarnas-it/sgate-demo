@@ -63,3 +63,65 @@ rules:
       - pattern: for $IDX := range $SLICE { ... }
       - pattern: if $IDX < len($SLICE) { ... }
       - pattern: if $IDX >= 0 && $IDX < len($SLICE) { ... }
+
+  # 6.3 а): админский маршрут зарегистрирован без middleware авторизации.
+  # 4 из 5 критичных находок шести пилотов SGATE — отсутствие проверки прав:
+  # passport-service (сброс пароля и смена ролей без admin), Jxls-report
+  # (весь API без auth), TaskTracker (экспорт), api-gateway (per-route auth).
+  #
+  # Правило ловит регистрацию без With(...): и на «админском» пути напрямую,
+  # и внутри блока Route("/…admin…", …). Сам Route не флагится: в
+  # passport-service группа /api/admin защищает каждого ребёнка через
+  # r.With(adminAuth), и находка на группе была бы ложной.
+  #
+  # Чего правило НЕ видит: middleware стоит, но роль внутри хендлера не
+  # проверяется (как в passport-service: adminAuth есть, а
+  # ResetAdminUserPassword не смотрит isAdmin). Это отдельный класс.
+  - id: sgate-go-admin-route-without-middleware
+    languages: [go]
+    message: "Админский маршрут зарегистрирован без middleware авторизации (CWE-862)."
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+    patterns:
+      - pattern-either:
+          # Прямая регистрация по админскому пути.
+          - patterns:
+              - pattern-either:
+                  - pattern: $R.Get($PATH, ...)
+                  - pattern: $R.Post($PATH, ...)
+                  - pattern: $R.Put($PATH, ...)
+                  - pattern: $R.Delete($PATH, ...)
+                  - pattern: $R.Patch($PATH, ...)
+                  - pattern: $R.Handle($PATH, ...)
+              - metavariable-regex:
+                  metavariable: $PATH
+                  regex: '(?i)^"[^"]*(admin|manage|console|superuser)[^"]*"$'
+          # Ребёнок внутри Route("/…admin…", …) без собственного With.
+          - patterns:
+              - pattern-either:
+                  - pattern: $R.Get($PATH, ...)
+                  - pattern: $R.Post($PATH, ...)
+                  - pattern: $R.Put($PATH, ...)
+                  - pattern: $R.Delete($PATH, ...)
+                  - pattern: $R.Patch($PATH, ...)
+                  - pattern: $R.Handle($PATH, ...)
+              - pattern-inside: |
+                  $G.Route($APATH, func(...) {
+                    ...
+                  })
+              - metavariable-regex:
+                  metavariable: $APATH
+                  regex: '(?i)^"[^"]*(admin|manage|console|superuser)[^"]*"$'
+      # With(...) ставит middleware на конкретный маршрут.
+      - pattern-not: $R2.With(...).$M($PATH, ...)
+      # Use(...) внутри самой админской группы защищает всех её детей.
+      # Тип параметра намеренно не указан: роутер может быть chi, gin или
+      # собственным интерфейсом — важно только, что middleware ставится.
+      - pattern-not-inside: |
+          $G3.Route($APATH3, func(...) {
+            ...
+            $R6.Use(...)
+            ...
+          })
