@@ -47,6 +47,11 @@ jobs:
           cd analyzers/ast
           go test ./...
           go vet ./...
+      # Второй AST-модуль на другом языке: тот же контракт, другой рантайм.
+      - name: Test Python analyzer
+        run: |
+          cd analyzers/astpy
+          python3 -m unittest discover -s tests -t .
 
   # Правила SAST проверяются на фикстурах с аннотациями ruleid:/ok:.
   # Без этого слишком широкое правило начинает шуметь на защищённом коде,

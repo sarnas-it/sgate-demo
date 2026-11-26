@@ -58,6 +58,7 @@
 | Модуль | Язык | Правила |
 |---|---|---|
 | `ast` | Go | `sgate-ast-broker-entity-subject` (entity из payload без сверки с subject), `sgate-ast-identity-param` (subject_org/snapshot_id из словаря) |
+| `astpy` | Python | `sgate-py-route-without-auth` (маршрут без проверки auth/прав), `sgate-py-trusted-identity-header` (X-User-* без проверки токена) |
 
 Правила `ast` дополняют semgrep, а не заменяют: они требуют связей внутри
 функции (декодирование сообщения → использование поля) и AST-обхода, которые

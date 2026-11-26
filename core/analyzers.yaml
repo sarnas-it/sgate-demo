@@ -155,3 +155,17 @@ analyzers:
     timeout: 5m
     scanned_regex: 'ast-scanned: (\S+)'
     min_scanned_files: 1
+
+  # Второй AST-модуль — Python. Тот же контракт, другой язык: новый язык
+  # подключается отдельным модулем, ядро не меняется.
+  - id: astpy
+    languages: [python]
+    runtime: command
+    command:
+      - sh
+      - -c
+      - 'cd "$SGATE_CONFIG_DIR/.." && exec python3 analyzers/astpy/main.py'
+    output: .sgate-astpy.sarif
+    timeout: 5m
+    scanned_regex: 'py-ast-scanned: (\S+)'
+    min_scanned_files: 1

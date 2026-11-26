@@ -31,3 +31,4 @@ dast/out/
 
 # AST-анализатор (command runtime)
 .sgate-ast.sarif
+.sgate-astpy.sarif
