@@ -128,3 +128,25 @@ analyzers:
 		t.Fatal("ожидалась ошибка: у регулярки нет группы захвата")
 	}
 }
+
+// TestLoadScannedTotalRequiresRegex — scanned_total без scanned_regex
+// бессмыслен: читать число неоткуда. Опечатка должна падать на старте.
+func TestLoadScannedTotalRequiresRegex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "analyzers.yaml")
+	raw := `version: 1
+analyzers:
+  - id: semgrep
+    languages: [go]
+    runtime: command
+    command: [semgrep]
+    output: /out/semgrep.sarif
+    scanned_total: true
+`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("ожидалась ошибка: scanned_total без scanned_regex")
+	}
+}

@@ -56,9 +56,13 @@ type Analyzer struct {
 	// анализаторов, которые пишут прогресс в лог (gosec: «Checking file: …»)
 	// и при ошибке сборки отдают пустой отчёт с кодом 0.
 	ScannedRegex string `yaml:"scanned_regex"`
-	// MinScannedFiles — минимум совпадений ScannedRegex, иначе прогон — сбой.
+	// MinScannedFiles — минимум просканированных файлов, иначе прогон — сбой.
 	// По умолчанию 1, если ScannedRegex задан.
 	MinScannedFiles int `yaml:"min_scanned_files"`
+	// ScannedTotal — как читать ScannedRegex: false — считать уникальные
+	// совпадения (по строке прогресса на файл, gosec); true — взять число из
+	// группы (итоговая строка анализатора, semgrep: «Ran 9 rules on 33 files»).
+	ScannedTotal bool `yaml:"scanned_total"`
 }
 
 // Config — корневой файл analyzers.yaml.
@@ -148,6 +152,9 @@ func Load(path string) (*Config, error) {
 			if a.MinScannedFiles <= 0 {
 				a.MinScannedFiles = 1
 			}
+		}
+		if a.ScannedTotal && a.ScannedRegex == "" {
+			return nil, fmt.Errorf("%s: scanned_total requires scanned_regex", a.ID)
 		}
 	}
 	return &c, nil

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,6 +126,33 @@ func RunDetailed(ctx context.Context, spec config.Analyzer, repo, configDir, out
 	return Result{Path: hostOut, ScannedFiles: scanned}, nil
 }
 
+// countFromOutput считает просканированные файлы по выводу анализатора.
+// total=false — уникальные совпадения (строка прогресса на файл);
+// total=true — число из группы (итоговая строка вида «... on 33 files»).
+func countFromOutput(re *regexp.Regexp, output string, total bool) int {
+	matches := re.FindAllStringSubmatch(output, -1)
+	if total {
+		best := 0
+		for _, m := range matches {
+			if len(m) < 2 {
+				continue
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(m[1]))
+			if err == nil && n > best {
+				best = n
+			}
+		}
+		return best
+	}
+	seen := map[string]struct{}{}
+	for _, m := range matches {
+		if len(m) > 1 && m[1] != "" {
+			seen[m[1]] = struct{}{}
+		}
+	}
+	return len(seen)
+}
+
 // countScanned определяет, сколько файлов анализатор реально открыл.
 // ScannedRegex приоритетнее: он видит прогресс даже у отчётов, где artifacts
 // не заполнены. RequireArtifacts — второй, независимый признак.
@@ -134,18 +162,13 @@ func countScanned(spec config.Analyzer, output, reportPath string) (int, error) 
 		if err != nil {
 			return 0, fmt.Errorf("%s: scanned_regex: %w", spec.ID, err)
 		}
-		seen := map[string]struct{}{}
-		for _, m := range re.FindAllStringSubmatch(output, -1) {
-			if len(m) > 1 && m[1] != "" {
-				seen[m[1]] = struct{}{}
-			}
-		}
-		if len(seen) < spec.MinScannedFiles {
-			return len(seen), fmt.Errorf(
+		scanned := countFromOutput(re, output, spec.ScannedTotal)
+		if scanned < spec.MinScannedFiles {
+			return scanned, fmt.Errorf(
 				"%s: просканировано %d файлов, ожидалось не меньше %d — анализ не состоялся (отчёт пустой или неполный)",
-				spec.ID, len(seen), spec.MinScannedFiles)
+				spec.ID, scanned, spec.MinScannedFiles)
 		}
-		return len(seen), nil
+		return scanned, nil
 	}
 	if spec.RequireArtifacts {
 		n, err := sarif.CountArtifacts(reportPath)

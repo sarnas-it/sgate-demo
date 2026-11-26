@@ -198,3 +198,60 @@ func TestNoCoverageChecksKeepsOldBehaviour(t *testing.T) {
 		t.Fatalf("без проверок покрытия пустой отчёт допустим: %v", err)
 	}
 }
+
+// TestScannedTotalReadsCountFromSummary — semgrep печатает итог «Ran N rules
+// on M files»: покрытие берётся из M, а не из числа совпадений (строка одна).
+func TestScannedTotalReadsCountFromSummary(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:              "fake",
+		Runtime:         "command",
+		Command:         []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"; echo "Ran 9 rules on 33 files: 5 findings." >&2`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Ran \d+ rules? on (\d+) files`,
+		ScannedTotal:    true,
+		MinScannedFiles: 1,
+	}
+	res, err := RunDetailed(context.Background(), spec, out, out, out, "")
+	if err != nil {
+		t.Fatalf("скан 33 файлов не должен падать: %v", err)
+	}
+	if res.ScannedFiles != 33 {
+		t.Fatalf("ScannedFiles = %d, want 33", res.ScannedFiles)
+	}
+}
+
+func TestScannedTotalZeroFilesFails(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:              "fake",
+		Runtime:         "command",
+		Command:         []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"; echo "Ran 9 rules on 0 files: 0 findings." >&2`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Ran \d+ rules? on (\d+) files`,
+		ScannedTotal:    true,
+		MinScannedFiles: 1,
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: 0 просканированных файлов")
+	}
+}
+
+func TestScannedTotalMissingLineFails(t *testing.T) {
+	out := t.TempDir()
+	spec := config.Analyzer{
+		ID:              "fake",
+		Runtime:         "command",
+		Command:         []string{"sh", "-c", `printf '{"runs":[]}' > "$SGATE_OUT"`},
+		Output:          "out.sarif",
+		Timeout:         "10s",
+		ScannedRegex:    `Ran \d+ rules? on (\d+) files`,
+		ScannedTotal:    true,
+		MinScannedFiles: 1,
+	}
+	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
+		t.Fatal("ожидалась ошибка: итоговой строки нет")
+	}
+}
