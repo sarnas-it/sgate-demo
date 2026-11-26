@@ -169,3 +169,18 @@ analyzers:
     timeout: 5m
     scanned_regex: 'py-ast-scanned: (\S+)'
     min_scanned_files: 1
+
+  # Межпакетный taint: источник и сток могут быть в разных пакетах
+  # (ГОСТ Р 71207-2024, 7.4). Отдельный модуль, контракт тот же.
+  - id: taint
+    languages: [go]
+    requires: [go.mod]
+    runtime: command
+    command:
+      - sh
+      - -c
+      - 'cd "$SGATE_CONFIG_DIR/.." && exec go run ./analyzers/taint'
+    output: .sgate-taint.sarif
+    timeout: 5m
+    scanned_regex: 'taint-scanned: (\S+)'
+    min_scanned_files: 1

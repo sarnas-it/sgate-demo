@@ -54,3 +54,18 @@ analyzers:
     fail_on:
       - "Golang errors in file"
     timeout: 10m
+
+  # Межпакетный taint (ГОСТ Р 71207-2024, 7.4): источник и сток могут быть
+  # в разных пакетах. Отдельный модуль, контракт «команда + SARIF».
+  - id: taint
+    languages: [go]
+    requires: [go.mod]
+    runtime: command
+    command:
+      - sh
+      - -c
+      - 'cd "$SGATE_CONFIG_DIR/.." && exec go run ./analyzers/taint'
+    output: .sgate-taint.sarif
+    timeout: 5m
+    scanned_regex: 'taint-scanned: (\S+)'
+    min_scanned_files: 1
