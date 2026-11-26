@@ -20,13 +20,18 @@ analyzers:
       - /out/semgrep.sarif
       - --error
       - --metrics=off
-      - --quiet
     mounts:
       - source: ../sast-rules
         target: /rules
         read_only: true
     output: /out/semgrep.sarif
     network: none
+    # Покрытие: semgrep печатает итог «Ran N rules on M files». Без --quiet
+    # эта строка — единственный признак, что скан состоялся: artifacts в
+    # SARIF он не заполняет. M=0 или отсутствие строки ⇒ сбой.
+    scanned_regex: 'Ran \d+ rules? on (\d+) files'
+    scanned_total: true
+    min_scanned_files: 1
     timeout: 10m
 
   - id: gosec
