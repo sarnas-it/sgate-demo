@@ -8,6 +8,7 @@
     {"id":"phpstan","image":"ghcr.io/phpstan/phpstan@sha256:a37607d838fa6e25d1debdd0f774021c2be91248e74126c32283c3d6d2ed1a0b","license":"MIT","source":"https://github.com/phpstan/phpstan"},
     {"id":"psalm","image":"ghcr.io/psalm/psalm@sha256:aaa6f374af93863832e89d74255f8c44997fbd9244bb66334d19d8ea4f9c285b","license":"MIT","source":"https://github.com/vimeo/psalm"},
     {"id":"ast","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/ast"},
-    {"id":"astpy","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/astpy"}
+    {"id":"astpy","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/astpy"},
+    {"id":"taint","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/taint"}
   ]
 }
