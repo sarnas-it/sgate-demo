@@ -184,3 +184,19 @@ analyzers:
     timeout: 5m
     scanned_regex: 'taint-scanned: (\S+)'
     min_scanned_files: 1
+
+  # SSA-проход с косвенными вызовами (7.4): обработчик может храниться как
+  # func-значение в структуре и вызываться через неё — AST-модуль `taint`
+  # такой поток не видит, SSA с RTA-графом видит. Отдельный модуль.
+  - id: ssa
+    languages: [go]
+    requires: [go.mod]
+    runtime: command
+    command:
+      - sh
+      - -c
+      - 'cd "$SGATE_CONFIG_DIR/.." && exec go run ./analyzers/ssa'
+    output: .sgate-ssa.sarif
+    timeout: 10m
+    scanned_regex: 'ssa-scanned: (\S+)'
+    min_scanned_files: 1

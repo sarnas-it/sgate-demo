@@ -9,6 +9,7 @@
     {"id":"psalm","image":"ghcr.io/psalm/psalm@sha256:aaa6f374af93863832e89d74255f8c44997fbd9244bb66334d19d8ea4f9c285b","license":"MIT","source":"https://github.com/vimeo/psalm"},
     {"id":"ast","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/ast"},
     {"id":"astpy","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/astpy"},
-    {"id":"taint","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/taint"}
+    {"id":"taint","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/taint"},
+    {"id":"ssa","runtime":"command","license":"Proprietary","source":"https://github.com/sarnas-it/sgate-demo/tree/main/analyzers/ssa"}
   ]
 }
