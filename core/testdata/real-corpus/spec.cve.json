@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "name": "listmonk",
+      "repo": "https://github.com/knadh/listmonk",
+      "commit": "e3499cf722155a11b8ca1a2baec3c09a61b9e1ed",
+      "module": ".",
+      "cve": "CVE-2026-62361",
+      "defects": [
+        {
+          "file": "internal/core/subscribers.go",
+          "line": 605,
+          "type": "6.3а",
+          "cwe": "CWE-89",
+          "note": "GHSA-xgjr-7j9q-2h4r: EXPLAIN строится конкатенацией с пользовательским query в validateQueryTables; исправлено в c0a6525009a65265230185f16e8674dcc83aa024"
+        }
+      ]
+    },
+    {
+      "name": "olivetin",
+      "repo": "https://github.com/OliveTin/OliveTin",
+      "commit": "e7eac3fa21a4bd371ca8bcdb2153966bc4b6a19b",
+      "module": "service",
+      "cve": "CVE-2026-75506",
+      "defects": [
+        {
+          "file": "internal/executor/executor_unix.go",
+          "line": 18,
+          "type": "6.3а",
+          "cwe": "CWE-78",
+          "note": "GHSA-vc6p-m6vx-6cwq: finalParsedCommand собирается из shellAfterCompleted с неэкранированными output/exitCode и уходит в sh -c; исправлено в e5d29b68da66fd7f99072d6afd336dee2c28876c"
+        }
+      ]
+    }
+  ]
+}
