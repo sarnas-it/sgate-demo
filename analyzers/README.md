@@ -59,6 +59,7 @@
 |---|---|---|
 | `ast` | Go | `sgate-ast-broker-entity-subject` (entity из payload без сверки с subject), `sgate-ast-identity-param` (subject_org/snapshot_id из словаря) |
 | `taint` | Go | `sgate-taint-sql`, `sgate-taint-command`, `sgate-taint-file`, `sgate-taint-ssrf` — межпакетный taint «источник → сток» |
+| `ssa` | Go | те же четыре правила — SSA-проход с графом вызовов RTA: находит поток через func-значения в структурах и интерфейсы, которые AST-модуль не разрешает |
 | `astpy` | Python | `sgate-py-route-without-auth` (маршрут без проверки auth/прав), `sgate-py-trusted-identity-header` (X-User-* без проверки токена) |
 
 Правила `ast` дополняют semgrep, а не заменяют: они требуют связей внутри

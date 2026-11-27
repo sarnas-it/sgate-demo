@@ -5,6 +5,7 @@ go 1.26.0
 // анализатора без публикации и без правок go.mod ядра.
 use (
 	./analyzers/ast
+	./analyzers/ssa
 	./analyzers/taint
 	./core
 )
