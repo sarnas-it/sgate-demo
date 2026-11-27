@@ -77,6 +77,38 @@ go run ./cmd/sgate quality -run "$run" \
   (repo + pre-fix commit + file/line), чтобы измерить FP на естественном
   коде. Без него FP-показатель на масштабе остаётся синтетическим.
 
+### Слой реальных проектов (10.2 в)
+
+Синтетика даёт 0 % FP и не воспроизводит естественный шум. Для реального
+показателя есть спецификация и сборщик:
+
+```bash
+scripts/fetch-real-corpus.sh core/testdata/real-corpus/spec.json /tmp/real-corpus
+```
+
+Формат спецификации — `core/testdata/real-corpus/spec.example.json`:
+
+```json
+{"version":1,"entries":[{
+  "name":"project","repo":"https://github.com/org/project.git","commit":"<pre-fix sha>",
+  "files":["go.mod","internal/api/handler.go"],
+  "defects":[{"file":"internal/api/handler.go","line":42,"type":"6.3а","cwe":"CWE-89"}],
+  "clean":["internal/api/middleware.go"]}]}
+```
+
+- `local` вместо `repo`+`commit` — офлайн-прогон и уже разобранные пилоты.
+- сборщик копирует файлы с префиксом проекта и собирает общий
+  `manifest.json` того же формата, что у синтетического корпуса;
+- прогон: `sgate -repo /tmp/real-corpus -config <config>`, затем
+  `sgate quality -run <run> -manifest /tmp/real-corpus/manifest.json`;
+- если файлы не самодостаточны (нет зависимостей), gosec не соберёт пакет —
+  для реального слоя используйте конфиг без gosec (semgrep + ast + taint),
+  они работают по AST.
+
+Статус: каркас готов, спецификация не заполнена. Каждый проект требует
+проверки pre-fix коммита и ручной разметки строки — это отдельная работа,
+а не автогенерация.
+
 Требования, которые пока не закрыты:
 
 - **Модельные и поточные варианты (6.6, 6.7).** Покрыты базовые варианты:

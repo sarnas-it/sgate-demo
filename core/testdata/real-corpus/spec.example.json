@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "name": "example-project",
+      "local": "/path/to/checkout",
+      "note": "шаблон: замените local на путь к клону или используйте repo+commit",
+      "files": [
+        "go.mod",
+        "internal/api/handler.go"
+      ],
+      "defects": [
+        {
+          "file": "internal/api/handler.go",
+          "line": 42,
+          "type": "6.3а",
+          "cwe": "CWE-89",
+          "note": "SQL собирается из параметра запроса; исправлено в <fix-commit>"
+        }
+      ],
+      "clean": [
+        "internal/api/middleware.go"
+      ]
+    }
+  ]
+}
