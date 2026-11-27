@@ -33,3 +33,4 @@ dast/out/
 .sgate-ast.sarif
 .sgate-astpy.sarif
 .sgate-taint.sarif
+core/testdata/corpus-generated/

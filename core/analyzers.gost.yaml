@@ -53,6 +53,10 @@ analyzers:
     # gosec при ошибке сборки печатает это и отдаёт пустой SARIF с кодом 0.
     fail_on:
       - "Golang errors in file"
+    # Покрытие: строка прогресса на каждый файл. Без неё «0 находок» от gosec
+    # неотличим от несостоявшегося прогона (инцидент на broker-cml-etl).
+    scanned_regex: 'Checking file: (\S+)'
+    min_scanned_files: 1
     timeout: 10m
 
   # Межпакетный taint (ГОСТ Р 71207-2024, 7.4): источник и сток могут быть
