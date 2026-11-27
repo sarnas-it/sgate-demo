@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"code.sarnas.ru/sgate/internal/config"
@@ -253,5 +254,50 @@ func TestScannedTotalMissingLineFails(t *testing.T) {
 	}
 	if _, err := Run(context.Background(), spec, out, out, out, ""); err == nil {
 		t.Fatal("ожидалась ошибка: итоговой строки нет")
+	}
+}
+
+// TestDockerContainerRemovedOnFailure — убитый docker CLI (OOM, отмена) не
+// должен оставлять контейнер анализатора работать: его убирают по имени.
+func TestDockerContainerRemovedOnFailure(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(dir, "docker.log")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$FAKE_DOCKER_LOG\"\nexit 0\n"
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("FAKE_DOCKER_LOG", logPath)
+
+	spec := config.Analyzer{
+		ID:      "gosec",
+		Runtime: "docker",
+		Image:   "securego/gosec:test",
+		Command: []string{"-fmt=sarif"},
+		Output:  "/out/gosec.sarif",
+		Timeout: "5s",
+	}
+	if _, err := Run(context.Background(), spec, dir, dir, dir, ""); err == nil {
+		t.Fatal("ожидалась ошибка: SARIF не создан")
+	}
+
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("ожидались run и rm, получено: %q", raw)
+	}
+	if !strings.HasPrefix(lines[0], "run --rm --name sgate-gosec-") {
+		t.Fatalf("нет --name в run: %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "rm -f sgate-gosec-") {
+		t.Fatalf("контейнер не убран: %q", lines[1])
 	}
 }

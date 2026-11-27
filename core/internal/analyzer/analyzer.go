@@ -47,13 +47,19 @@ func RunDetailed(ctx context.Context, spec config.Analyzer, repo, configDir, out
 	}
 
 	var cmd *exec.Cmd
+	var container string
 	switch spec.Runtime {
 	case "docker":
-		args, err := dockerArgs(spec, repo, configDir, outDir, user)
+		container = containerName(spec.ID)
+		args, err := dockerArgs(spec, repo, configDir, outDir, user, container)
 		if err != nil {
 			return Result{}, err
 		}
 		cmd = exec.CommandContext(ctx, "docker", args...)
+		// --rm убирает контейнер при штатном выходе, но убитый CLI (OOM,
+		// отмена контекста) оставляет его работать и есть память. Поэтому
+		// удаляем по имени всегда.
+		defer removeContainer(container)
 	case "command":
 		if len(spec.Command) == 0 {
 			return Result{}, fmt.Errorf("%s: empty command", spec.ID)
@@ -193,6 +199,29 @@ func matchFailOn(patterns []string, output string) string {
 	return ""
 }
 
+// containerName — уникальное имя контейнера анализатора: позволяет убрать
+// его даже если docker CLI убит (OOM/таймаут), не задевая другие прогоны.
+func containerName(analyzerID string) string {
+	id := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		return '-'
+	}, analyzerID)
+	return fmt.Sprintf("sgate-%s-%d-%d", id, os.Getpid(), time.Now().UnixNano())
+}
+
+// removeContainer убирает контейнер по имени; ошибки игнорируются: контейнер
+// мог уже быть удалён --rm.
+func removeContainer(name string) {
+	if name == "" {
+		return
+	}
+	rmCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_ = exec.CommandContext(rmCtx, "docker", "rm", "-f", name).Run()
+}
+
 func exitAllowed(codes []int, code int) bool {
 	for _, c := range codes {
 		if c == code {
@@ -212,13 +241,14 @@ func hostOutput(spec config.Analyzer, repo, outDir string) string {
 	return filepath.Join(outDir, strings.TrimPrefix(spec.Output, "/out/"))
 }
 
-func dockerArgs(spec config.Analyzer, repo, configDir, outDir, user string) ([]string, error) {
+func dockerArgs(spec config.Analyzer, repo, configDir, outDir, user, container string) ([]string, error) {
 	workdir := spec.Workdir
 	if workdir == "" {
 		workdir = "/src"
 	}
 	args := []string{
 		"run", "--rm",
+		"--name", container,
 		"--network", spec.Network,
 		"--security-opt", "no-new-privileges",
 		"--pids-limit", "512",
