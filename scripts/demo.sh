@@ -26,6 +26,17 @@ semgrep_image="${SEMGREP_IMAGE:-semgrep/semgrep:1.186.0}"
 out="$root/.demo-out"
 base="${BASE_REF:-main}"
 
+# В свежем клоне ветки demo/* есть только как origin/demo/*. Сценарии
+# обращаются к ним по короткому имени, поэтому создаём локальные ссылки
+# из remote-tracking (без сети).
+for branch in demo/secret-leak demo/pii-leak demo/critical-dependency \
+              demo/fix-next demo/sast-go demo/sast-php; do
+  if ! git rev-parse --verify --quiet "refs/heads/$branch" >/dev/null &&
+     git rev-parse --verify --quiet "refs/remotes/origin/$branch" >/dev/null; then
+    git branch --no-track "$branch" "origin/$branch" >/dev/null
+  fi
+done
+
 if [ ! -x "$tools/deps" ] || [ ! -x "$tools/guardrail" ]; then
   echo "Нет бинарников в $tools — собираю."
   "$root/scripts/build-tools.sh"
