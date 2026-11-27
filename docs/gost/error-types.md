@@ -121,7 +121,7 @@ var mu sync.Mutex; go func() { defer mu.Unlock() }()
 
 | Тип | Обязателен | Анализаторы | Правила |
 |---|---|---|---|
-| 6.3а | да | gosec semgrep ssa | G107, G111, G201, G202, G203, G204, G304, G305, G701, G702, G703, G704, G705, G706, semgrep:command-injection, semgrep:dangerouslysetinnerhtml, semgrep:open-redirect, semgrep:path-traversal, semgrep:raw-html, semgrep:shell, semgrep:sql, semgrep:ssrf, semgrep:xss, ssa:taint-sql |
+| 6.3а | да | gosec semgrep | G107, G111, G201, G202, G203, G204, G304, G305, G701, G702, G703, G704, G705, G706, semgrep:command-injection, semgrep:dangerouslysetinnerhtml, semgrep:open-redirect, semgrep:path-traversal, semgrep:raw-html, semgrep:shell, semgrep:sql, semgrep:ssrf, semgrep:xss |
 | 6.3б | да | gosec semgrep | G115, semgrep:overflow |
 | 6.3в | да | gosec semgrep | G602, semgrep:out-of-bounds, semgrep:slice-index |
 | 6.3г | да | gosec semgrep | G101, G102, G106, G301, G302, G303, G306, G401, G402, G403, G404, G405, G406, G501, G502, G503, G505, semgrep:hardcoded-credentials, semgrep:insecure-random, semgrep:math-random, semgrep:md5, semgrep:permission, semgrep:sha1, semgrep:tls, semgrep:use-tls, semgrep:weak-crypto |
