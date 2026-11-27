@@ -11,6 +11,13 @@ on:
   schedule:
     - cron: "0 4 * * 1"
   workflow_dispatch:
+    inputs:
+      defect_files:
+        description: "Пакетов с ошибками в большом корпусе (8 ошибок на пакет)"
+        default: "160"
+      clean_files:
+        description: "Чистых пакетов (по 500 строк)"
+        default: "40"
 
 jobs:
   quality:
@@ -78,8 +85,11 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - name: Сгенерировать корпус 100 тыс. строк (10.2 в)
-        run: go run ./cmd/corpusgen -out testdata/corpus-generated
+      - name: Сгенерировать корпус (10.2 в)
+        run: |
+          go run ./cmd/corpusgen -out testdata/corpus-generated \
+            -defect-files ${{ inputs.defect_files || 160 }} \
+            -clean-files ${{ inputs.clean_files || 40 }}
 
       - name: Прогон SGATE по корпусу
         run: |
