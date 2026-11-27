@@ -61,3 +61,47 @@ jobs:
             /tmp/quality-report.md
             core/.sgate/runs
           if-no-files-found: warn
+
+  # 10.2 в): корпус на 100 тыс. строк. Отдельной джобой, потому что прогон
+  # gosec по 200 пакетам заметно дольше базового набора; PR его не ждёт.
+  large-corpus:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - name: Сгенерировать корпус 100 тыс. строк (10.2 в)
+        run: go run ./cmd/corpusgen -out testdata/corpus-generated
+
+      - name: Прогон SGATE по корпусу
+        run: |
+          set +e
+          go run ./cmd/sgate -repo testdata/corpus-generated -config analyzers.gost.yaml \
+            -format json -record .sgate/large > /tmp/large.json
+          code=$?
+          # 1 — есть блокирующие находки, это ожидаемо: корпус состоит из ошибок.
+          test "$code" -le 1
+
+      - name: Измерить качество (10.4/10.5)
+        run: |
+          run=$(ls -d .sgate/large/*/ | sort | tail -1)
+          go run ./cmd/sgate quality -run "$run" \
+            -manifest testdata/corpus-generated/manifest.json \
+            -format markdown -out /tmp/quality-large.md
+          cat /tmp/quality-large.md
+
+      - name: Отчёт
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-large-report
+          path: /tmp/quality-large.md
+
