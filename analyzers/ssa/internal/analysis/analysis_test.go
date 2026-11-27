@@ -114,3 +114,39 @@ func main() {
 		}
 	}
 }
+
+// TestPreparedStatementNotSink — у *sql.Stmt нет SQL-аргумента, поэтому
+// параметры запроса не должны считаться вторым аргументом-запросом.
+// Регрессия: на listmonk подготовленные запросы давали десятки ложных
+// SQL-находок (c.q.UpdateUserProfile.Exec(id, name, ...)).
+func TestPreparedStatementNotSink(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module example.com/stmt\n\ngo 1.26.0\n")
+	writeFile(t, dir, "main.go", `package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	stmt, err := db.Prepare("UPDATE users SET name = ? WHERE id = ?")
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+	_, _ = stmt.Exec(r.FormValue("name"), r.FormValue("id"))
+}
+
+func main() {}
+`)
+	findings, _, err := Analyze(dir)
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	for _, f := range findings {
+		if f.Rule == "sgate-ssa-taint-sql" {
+			t.Fatalf("ложная SQL-находка на подготовленном запросе: %+v", f)
+		}
+	}
+}

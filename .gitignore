@@ -34,3 +34,7 @@ dast/out/
 .sgate-astpy.sarif
 .sgate-taint.sarif
 core/testdata/corpus-generated/
+
+# кэш клонов корпуса реальных проектов
+.real-corpus-cache/
+.real-cve-cache/

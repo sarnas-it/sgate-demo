@@ -150,6 +150,7 @@ func Analyze(root string) ([]Finding, []string, error) {
 	}
 
 	a.reachable = httpReachable(cg, all)
+
 	for round := 0; round < 10; round++ {
 		a.changed = false
 		for _, f := range all {
@@ -232,7 +233,23 @@ func isHTTPHandler(f *ssa.Function) bool {
 		return true
 	}
 	sig := f.Signature
-	if sig == nil || sig.Params().Len() != 2 || sig.Results().Len() != 0 {
+	if sig == nil {
+		return false
+	}
+	// Обработчики веб-фреймворков: echo.Context, gin.Context, fiber.Ctx.
+	// Они регистрируются как func-значения и в граф от net/http могут не
+	// попасть, но по сигнатуре это точка входа запроса.
+	if sig.Params().Len() == 1 {
+		pt := sig.Params().At(0).Type().String()
+		// Путь модуля может содержать мажорную версию: echo/v4.Context.
+		if strings.HasSuffix(pt, ".Context") && (strings.Contains(pt, "echo") || strings.Contains(pt, "gin")) {
+			return true
+		}
+		if strings.HasSuffix(pt, ".Ctx") && strings.Contains(pt, "fiber") {
+			return true
+		}
+	}
+	if sig.Params().Len() != 2 || sig.Results().Len() != 0 {
 		return false
 	}
 	first := sig.Params().At(0).Type().String()
@@ -495,29 +512,50 @@ func (a *analyzer) callees(call ssa.CallInstruction) []*ssa.Function {
 func (a *analyzer) sinkRule(common *ssa.CallCommon, tainted map[ssa.Value]bool) string {
 	name, recv, pkg := callInfo(common)
 	switch name {
-	case "Query", "QueryContext", "QueryRow", "QueryRowContext", "Exec", "ExecContext":
-		if !strings.Contains(recv, "database/sql") && !strings.Contains(recv, "pgx") && !strings.Contains(recv, "clickhouse") {
+	case "Get":
+		// sqlx: Get(dest, query, args...) — SQL-сток; net/http: Get(url) — SSRF.
+		if strings.Contains(recv, "sqlx") {
+			for _, arg := range common.Args {
+				if b, ok := arg.Type().Underlying().(*types.Basic); ok && b.Kind() == types.String && tainted[arg] {
+					return "sgate-ssa-taint-sql"
+				}
+			}
 			return ""
 		}
+		if recv != "" || !strings.HasSuffix(pkg, "net/http") {
+			return ""
+		}
+		if len(common.Args) > 0 && tainted[common.Args[0]] {
+			return "sgate-ssa-taint-ssrf"
+		}
+
+	case "Query", "QueryContext", "QueryRow", "QueryRowContext", "Exec", "ExecContext",
+		"Queryx", "QueryRowx", "NamedExec", "Select":
+		if !strings.Contains(recv, "database/sql") && !strings.Contains(recv, "pgx") &&
+			!strings.Contains(recv, "clickhouse") && !strings.Contains(recv, "sqlx") {
+			return ""
+		}
+		// Подготовленный запрос (*sql.Stmt, *sqlx.Stmt, *sqlx.NamedStmt):
+		// SQL уже зафиксирован, аргументы — только параметры. Считать его
+		// стоком нельзя, иначе любая строка-параметр даёт ложную находку.
+		if strings.Contains(recv, "Stmt") {
+			return ""
+		}
+		// Позиция SQL-аргумента. sqlx Get/Select принимают dest первым,
+		// pgx/clickhouse — context первым; остальные — запрос первым.
+		// Получатель (для статического вызова метода) входит в Args.
 		offset := 0
-		if !common.IsInvoke() {
-			if f := common.StaticCallee(); f != nil && f.Signature != nil && f.Signature.Recv() != nil {
-				offset = 1 // receiver входит в Args
-			}
+		if f := common.StaticCallee(); f != nil && f.Signature != nil && f.Signature.Recv() != nil {
+			offset = 1
 		}
-		queryIdx := offset
-		if strings.HasSuffix(name, "Context") {
-			queryIdx++
+		idx := offset
+		if name == "Get" || name == "Select" {
+			idx++
+		} else if strings.Contains(recv, "pgx") || strings.Contains(recv, "clickhouse") || strings.HasSuffix(name, "Context") {
+			idx++
 		}
-		if queryIdx < len(common.Args) && tainted[common.Args[queryIdx]] {
+		if idx < len(common.Args) && tainted[common.Args[idx]] {
 			return "sgate-ssa-taint-sql"
-		}
-		// У pgx сигнатура Query(ctx, sql, args...): суффикса Context нет,
-		// поэтому позиция запроса определяется по типу string.
-		for _, arg := range common.Args {
-			if basic, ok := arg.Type().Underlying().(*types.Basic); ok && basic.Kind() == types.String && tainted[arg] {
-				return "sgate-ssa-taint-sql"
-			}
 		}
 	case "Command", "CommandContext":
 		if recv == "" && strings.HasSuffix(pkg, "os/exec") {
@@ -535,7 +573,7 @@ func (a *analyzer) sinkRule(common *ssa.CallCommon, tainted map[ssa.Value]bool) 
 				}
 			}
 		}
-	case "Get", "Post", "NewRequest", "NewRequestWithContext":
+	case "Post", "NewRequest", "NewRequestWithContext":
 		// Только функции пакета net/http. Методы с теми же именами
 		// (http.Header.Get — это обычный map-лукап) сюда не относятся.
 		if recv != "" || !strings.HasSuffix(pkg, "net/http") {
